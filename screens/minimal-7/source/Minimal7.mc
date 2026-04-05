@@ -48,7 +48,7 @@ class Minimal7 extends WatchUi.DataField {
     // ── 3-second power ring buffer ────────────────────────────────────────
     // Activity.Info only exposes currentPower (instantaneous), so we maintain
     // a 3-slot ring buffer updated every compute() call (~1 Hz) and average it.
-    hidden var mPowerBuf as Array = [0, 0, 0] as Array<Number>;
+    hidden var mPowerBuf as Array<Number> = [0, 0, 0];
     hidden var mPowerIdx as Number = 0;
 
     // ── FTP (loaded once at startup from user settings) ───────────────────
