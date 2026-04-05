@@ -2,7 +2,7 @@
 <iq:manifest xmlns:iq="http://www.garmin.com/xml/connectiq" version="3">
     <iq:application id="7754a7d6-2ad0-4919-a8da-f4cdb0a75d40"
                     name="@Strings.AppName"
-                    minSdkVersion="3.2.0"
+                    minSdkVersion="3.3.0"
                     type="datafield"
                     entry="ExampleField">
         <iq:products>
