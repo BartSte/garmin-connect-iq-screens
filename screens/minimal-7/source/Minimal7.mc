@@ -38,28 +38,35 @@ class Minimal7 extends WatchUi.DataField {
     // ── state — written by compute(), read by onUpdate() ─────────────────
     hidden var mHour       as Number = 0;
     hidden var mMinute     as Number = 0;
-    hidden var mTimerMs    as Number = 0;  // activity timer in ms
-    hidden var m3sPower    as Number = 0;  // rolling 3-sample average, watts
+    hidden var mTimerMs    as Number = 0;    // activity timer in ms
+    hidden var m3sPower    as Number = 0;    // rolling 3-sample average, watts
     hidden var mSpeed      as Float  = 0.0f; // km/h
-    hidden var mCadence    as Number = 0;  // rpm
-    hidden var mAscent     as Number = 0;  // meters (cumulative)
+    hidden var mCadence    as Number = 0;    // rpm
+    hidden var mAscent     as Float  = 0.0f; // meters (cumulative); Float matches SDK type
     hidden var mDistanceKm as Float  = 0.0f; // km
 
     // ── 3-second power ring buffer ────────────────────────────────────────
     // Activity.Info only exposes currentPower (instantaneous), so we maintain
     // a 3-slot ring buffer updated every compute() call (~1 Hz) and average it.
-    hidden var mPowerBuf as Array<Number> = [0, 0, 0];
-    hidden var mPowerIdx as Number = 0;
+    hidden var mPowerBuf   as Array<Number> = [0, 0, 0];
+    hidden var mPowerIdx   as Number = 0;
+    hidden var mPowerCount as Number = 0; // tracks warm-up: 0–3 samples seen so far
 
     // ── FTP (loaded once at startup from user settings) ───────────────────
+    // mFtp == 0 means no valid FTP is configured; zone colouring is disabled.
     hidden var mFtp as Number = 230;
 
     function initialize() {
         DataField.initialize();
-        mFtp = Application.Properties.getValue("ftp") as Number;
-        if (mFtp <= 0) {
-            mFtp = 230; // guard against a misconfigured 0 value
+        var ftpVal = Application.Properties.getValue("ftp");
+        if (ftpVal != null) {
+            var v = ftpVal as Number;
+            // 0 or negative disables zone colouring rather than falling back to
+            // an arbitrary default that would be wrong for this rider.
+            mFtp = (v > 0) ? v : 0;
         }
+        // If ftpVal is null (e.g. sideloaded .prg with no registered settings),
+        // mFtp retains its field-level default of 230.
     }
 
     // onLayout is intentionally empty.
@@ -82,9 +89,20 @@ class Minimal7 extends WatchUi.DataField {
         var rawPower = (info has :currentPower && info.currentPower != null)
             ? (info.currentPower as Number)
             : 0;
+        if (mPowerCount < 3) {
+            mPowerCount++;
+            if (mPowerCount == 1) {
+                // Pre-fill all slots so the first displayed average equals the
+                // first real sample instead of being diluted by zero-initialised slots.
+                mPowerBuf[0] = rawPower;
+                mPowerBuf[1] = rawPower;
+                mPowerBuf[2] = rawPower;
+            }
+        }
         mPowerBuf[mPowerIdx] = rawPower;
         mPowerIdx = (mPowerIdx + 1) % 3;
-        m3sPower = (mPowerBuf[0] + mPowerBuf[1] + mPowerBuf[2]) / 3;
+        // +1 before dividing gives nearest-integer rounding instead of floor.
+        m3sPower = (mPowerBuf[0] + mPowerBuf[1] + mPowerBuf[2] + 1) / 3;
 
         mSpeed = (info has :currentSpeed && info.currentSpeed != null)
             ? ((info.currentSpeed as Float) * 3.6f) // m/s → km/h
@@ -95,8 +113,8 @@ class Minimal7 extends WatchUi.DataField {
             : 0;
 
         mAscent = (info has :totalAscent && info.totalAscent != null)
-            ? (info.totalAscent as Number)
-            : 0;
+            ? (info.totalAscent as Float) // SDK type is Float; retain precision
+            : 0.0f;
 
         mDistanceKm = (info has :elapsedDistance && info.elapsedDistance != null)
             ? ((info.elapsedDistance as Float) / 1000.0f) // m → km
@@ -105,29 +123,31 @@ class Minimal7 extends WatchUi.DataField {
 
     // Called when the field needs repainting.
     function onUpdate(dc as Graphics.Dc) as Void {
-        var w    = dc.getWidth();
-        var h    = dc.getHeight();
-        var rowH = h / 4; // integer division — 4 equal rows
+        var w     = dc.getWidth();
+        var h     = dc.getHeight();
+        var rowH  = h / 4; // integer division — 4 equal rows
+        var row4H = h - rowH * 3; // last row absorbs any remainder pixels
 
         // Clear the whole field to the device background color.
         var bgColor = getBackgroundColor();
         dc.setColor(bgColor, bgColor);
         dc.clear();
 
-        drawRow1(dc, w, rowH, 0);          // time of day | timer
-        drawRow2(dc, w, rowH, rowH);       // 3s power (zone background)
-        drawRow3(dc, w, rowH, rowH * 2);   // speed | cadence
-        drawRow4(dc, w, rowH, rowH * 3);   // ascent | distance
+        // Compute foreground color once and pass it down to avoid repeated
+        // getBackgroundColor() calls per frame.
+        var fg = defaultFgColor();
 
-        // Dividers are drawn last so they appear on top of all cell content.
-        drawDividers(dc, w, h, rowH);
+        drawRow1(dc, w, rowH,  0,        fg); // time of day | timer
+        drawRow2(dc, w, rowH,  rowH);         // 3s power (zone background)
+        drawRow3(dc, w, rowH,  rowH * 2, fg); // speed | cadence
+        drawRow4(dc, w, row4H, rowH * 3, fg); // ascent | distance
+        drawDividers(dc, w, h, rowH,     fg);
     }
 
     // ── Row 1: time of day (left)  |  activity timer (right) ─────────────
-    hidden function drawRow1(dc as Graphics.Dc, w as Number, rowH as Number, y as Number) as Void {
-        var fg    = defaultFgColor();
-        var half  = w / 2;
-        var timeStr  = mHour.format("%02d") + ":" + mMinute.format("%02d");
+    hidden function drawRow1(dc as Graphics.Dc, w as Number, rowH as Number, y as Number, fg as Number) as Void {
+        var half    = w / 2;
+        var timeStr = mHour.format("%02d") + ":" + mMinute.format("%02d");
         drawCell(dc, 0,    y, half, rowH, fg, timeStr);
         drawCell(dc, half, y, half, rowH, fg, formatTimer(mTimerMs));
     }
@@ -136,7 +156,7 @@ class Minimal7 extends WatchUi.DataField {
     hidden function drawRow2(dc as Graphics.Dc, w as Number, rowH as Number, y as Number) as Void {
         var pct    = (mFtp > 0) ? (m3sPower * 100 / mFtp) : 0;
         var zoneBg = powerZoneColor(pct);
-        var zoneFg = powerZoneTextColor(zoneBg);
+        var zoneFg = powerZoneTextColor(pct);
 
         dc.setColor(zoneBg, Graphics.COLOR_TRANSPARENT);
         dc.fillRectangle(0, y, w, rowH);
@@ -151,26 +171,24 @@ class Minimal7 extends WatchUi.DataField {
     }
 
     // ── Row 3: speed (left)  |  cadence (right) ──────────────────────────
-    hidden function drawRow3(dc as Graphics.Dc, w as Number, rowH as Number, y as Number) as Void {
-        var fg   = defaultFgColor();
+    hidden function drawRow3(dc as Graphics.Dc, w as Number, rowH as Number, y as Number, fg as Number) as Void {
         var half = w / 2;
         drawCell(dc, 0,    y, half, rowH, fg, mSpeed.format("%.1f"));
         drawCell(dc, half, y, half, rowH, fg, mCadence.format("%d"));
     }
 
     // ── Row 4: ascent (left)  |  distance (right) ────────────────────────
-    hidden function drawRow4(dc as Graphics.Dc, w as Number, rowH as Number, y as Number) as Void {
-        var fg   = defaultFgColor();
+    hidden function drawRow4(dc as Graphics.Dc, w as Number, rowH as Number, y as Number, fg as Number) as Void {
         var half = w / 2;
-        drawCell(dc, 0,    y, half, rowH, fg, mAscent.format("%d"));
+        drawCell(dc, 0,    y, half, rowH, fg, mAscent.format("%.0f"));
         drawCell(dc, half, y, half, rowH, fg, mDistanceKm.format("%.2f"));
     }
 
     // ── Grid dividers ─────────────────────────────────────────────────────
     // Three horizontal lines at every row boundary.
     // Vertical lines split rows 1, 3, and 4; row 2 (power) is full-width.
-    hidden function drawDividers(dc as Graphics.Dc, w as Number, h as Number, rowH as Number) as Void {
-        dc.setColor(defaultFgColor(), Graphics.COLOR_TRANSPARENT);
+    hidden function drawDividers(dc as Graphics.Dc, w as Number, h as Number, rowH as Number, fg as Number) as Void {
+        dc.setColor(fg, Graphics.COLOR_TRANSPARENT);
 
         // Horizontal lines
         dc.drawLine(0, rowH,     w, rowH);      // between rows 1 and 2
@@ -224,15 +242,18 @@ class Minimal7 extends WatchUi.DataField {
         return ZONE1_COLOR;
     }
 
-    // Returns white or black text color for sufficient contrast on a zone background.
-    // Dark zones (blue, red, purple) get white; light zones get black.
-    hidden function powerZoneTextColor(zoneBg as Number) as Number {
-        if (zoneBg == ZONE2_COLOR ||
-            zoneBg == ZONE6_COLOR ||
-            zoneBg == ZONE7_COLOR) {
-            return Graphics.COLOR_WHITE;
-        }
-        return Graphics.COLOR_BLACK;
+    // Returns white or black text for sufficient contrast on each zone background.
+    // Derived from zone thresholds rather than color values to stay in sync with
+    // any future color changes.
+    //   Z1 gray        → black
+    //   Z2 blue        → white
+    //   Z3/Z4/Z5 green/yellow/orange → black
+    //   Z6/Z7 red/purple → white
+    hidden function powerZoneTextColor(pct as Number) as Number {
+        if (pct >= ZONE6_PCT) { return Graphics.COLOR_WHITE; }  // dark red / purple
+        if (pct >= ZONE3_PCT) { return Graphics.COLOR_BLACK; }  // green / yellow / orange
+        if (pct >= ZONE2_PCT) { return Graphics.COLOR_WHITE; }  // blue
+        return Graphics.COLOR_BLACK;                            // Z1 gray
     }
 
     // Formats an activity timer (milliseconds) as "M:SS" or "H:MM:SS".
