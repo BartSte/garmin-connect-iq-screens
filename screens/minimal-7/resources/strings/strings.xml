@@ -2,4 +2,6 @@
 <strings>
     <string id="AppName">Minimal 7</string>
     <string id="FtpTitle">FTP (W)</string>
+    <string id="CadenceMinTitle">Cadence Min (rpm)</string>
+    <string id="CadenceMaxTitle">Cadence Max (rpm)</string>
 </strings>

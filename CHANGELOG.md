@@ -6,6 +6,7 @@
 
 - Numeric fields now use the largest built-in number font that fits their current value while keeping a small cell margin.
 - Removed the font-size setting from app settings.
+- The cadence field is now green when cadence is between a minimal and a maximal value (default: 80-95 rpm) and white otherwise.
 
 ### v1.1.0
 

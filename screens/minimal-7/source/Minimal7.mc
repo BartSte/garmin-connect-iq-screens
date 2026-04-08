@@ -36,6 +36,7 @@ const ZONE4_COLOR = 0xFFFF00; // Z4 threshold        — yellow
 const ZONE5_COLOR = 0xFF8800; // Z5 VO2 max          — orange
 const ZONE6_COLOR = 0xAA0000; // Z6 anaerobic        — red
 const ZONE7_COLOR = 0x800080; // Z7 neuromuscular    — purple
+const CADENCE_TARGET_COLOR = 0x00AA00; // 80-95 rpm sweet spot — green
 
 class Minimal7 extends WatchUi.DataField {
 
@@ -59,12 +60,24 @@ class Minimal7 extends WatchUi.DataField {
     // ── FTP ───────────────────────────────────────────────────────────────
     // mFtp == 0 means no valid FTP is configured; zone colouring is disabled.
     hidden var mFtp as Number = 230;
+    hidden var mCadenceMin as Number = 80;
+    hidden var mCadenceMax as Number = 95;
 
     function initialize() {
         DataField.initialize();
 
         var ftpValue = Application.Properties.getValue("ftp");
         mFtp = valueToNumber(ftpValue, 230);
+
+        var cadenceMin = valueToNumber(Application.Properties.getValue("cadence_min"), 80);
+        var cadenceMax = valueToNumber(Application.Properties.getValue("cadence_max"), 95);
+        if (cadenceMin <= cadenceMax) {
+            mCadenceMin = cadenceMin;
+            mCadenceMax = cadenceMax;
+        } else {
+            mCadenceMin = cadenceMax;
+            mCadenceMax = cadenceMin;
+        }
     }
 
     // onLayout is intentionally empty.
@@ -159,8 +172,10 @@ class Minimal7 extends WatchUi.DataField {
     // ── Row 3: speed (left)  |  cadence (right) ──────────────────────────
     hidden function drawRow3(dc as Graphics.Dc, w as Number, rowH as Number, y as Number, fg as Number) as Void {
         var half = w / 2;
+        var cadenceBg = cadenceTargetBgColor(mCadence);
+        var cadenceFg = cadenceTargetFgColor(mCadence, fg);
         drawCell(dc, 0,    y, half, rowH, fg, null, mSpeed.format("%.1f"));
-        drawCell(dc, half, y, half, rowH, fg, null, mCadence.format("%d"));
+        drawCell(dc, half, y, half, rowH, cadenceFg, cadenceBg, mCadence.format("%d"));
     }
 
     // ── Row 4: ascent (left)  |  distance (right) ────────────────────────
@@ -328,6 +343,19 @@ class Minimal7 extends WatchUi.DataField {
         if (pct >= ZONE3_PCT) { return Graphics.COLOR_BLACK; }  // green / yellow / orange
         if (pct >= ZONE2_PCT) { return Graphics.COLOR_WHITE; }  // blue
         return Graphics.COLOR_BLACK;                            // Z1 gray
+    }
+
+    hidden function cadenceTargetBgColor(cadence as Number) as Number or Null {
+        if ((cadence >= mCadenceMin) && (cadence <= mCadenceMax)) {
+            return CADENCE_TARGET_COLOR;
+        }
+        return null;
+    }
+
+    hidden function cadenceTargetFgColor(cadence as Number, defaultFg as Number) as Number {
+        return (cadenceTargetBgColor(cadence) != null)
+            ? Graphics.COLOR_BLACK
+            : defaultFg;
     }
 
     // Formats an activity timer (milliseconds) as "M:SS" or "H:MM:SS".
