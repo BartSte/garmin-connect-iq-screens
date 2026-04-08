@@ -24,6 +24,10 @@ const ZONE5_PCT = 105;
 const ZONE6_PCT = 120;
 const ZONE7_PCT = 150;
 
+const FONT_SIZE_SMALL  = 0;
+const FONT_SIZE_MEDIUM = 1;
+const FONT_SIZE_LARGE  = 2;
+
 // ── Background color per zone ─────────────────────────────────────────────
 const ZONE1_COLOR = 0xAAAAAA; // Z1 active recovery  — light gray
 const ZONE2_COLOR = 0x0000AA; // Z2 endurance        — blue
@@ -55,12 +59,14 @@ class Minimal7 extends WatchUi.DataField {
     // ── FTP ───────────────────────────────────────────────────────────────
     // mFtp == 0 means no valid FTP is configured; zone colouring is disabled.
     hidden var mFtp as Number = 230;
+    hidden var mFontSize as Number = FONT_SIZE_LARGE;
 
     function initialize() {
         DataField.initialize();
 
         var ftpValue = Application.Properties.getValue("ftp");
         mFtp = valueToNumber(ftpValue, 230);
+        mFontSize = normalizeFontSize(Application.Properties.getValue("font_size"));
     }
 
     // onLayout is intentionally empty.
@@ -139,17 +145,20 @@ class Minimal7 extends WatchUi.DataField {
         var pct    = (mFtp > 0) ? (m3sPower * 100 / mFtp) : 0;
         var zoneBg = powerZoneColor(pct);
         var zoneFg = powerZoneTextColor(pct);
+        var text   = m3sPower.format("%d");
 
         dc.setColor(zoneBg, Graphics.COLOR_TRANSPARENT);
         dc.fillRectangle(0, y, w, rowH);
 
         dc.setColor(zoneFg, Graphics.COLOR_TRANSPARENT);
+        dc.setClip(0, y, w, rowH);
         dc.drawText(
             w / 2, y + rowH / 2,
-            Graphics.FONT_NUMBER_HOT,
-            m3sPower.format("%d"),
+            fittingFont(dc, text, w, rowH, powerRowFonts()),
+            text,
             Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER
         );
+        dc.clearClip();
     }
 
     // ── Row 3: speed (left)  |  cadence (right) ──────────────────────────
@@ -197,13 +206,15 @@ class Minimal7 extends WatchUi.DataField {
         text    as String
     ) as Void {
         dc.setColor(fgColor, Graphics.COLOR_TRANSPARENT);
+        dc.setClip(x, y, w, h);
         dc.drawText(
             x + w / 2,
             y + h / 2,
-            Graphics.FONT_NUMBER_MEDIUM,
+            fittingFont(dc, text, w, h, standardCellFonts()),
             text,
             Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER
         );
+        dc.clearClip();
     }
 
     // White text on black device background, black text on light background.
@@ -211,6 +222,51 @@ class Minimal7 extends WatchUi.DataField {
         return (getBackgroundColor() == Graphics.COLOR_BLACK)
             ? Graphics.COLOR_WHITE
             : Graphics.COLOR_BLACK;
+    }
+
+    hidden function standardCellFonts() as Array<Graphics.FontDefinition> {
+        if (mFontSize == FONT_SIZE_SMALL) {
+            return [Graphics.FONT_NUMBER_MILD];
+        }
+        if (mFontSize == FONT_SIZE_MEDIUM) {
+            return [Graphics.FONT_NUMBER_MEDIUM, Graphics.FONT_NUMBER_MILD];
+        }
+        return [Graphics.FONT_NUMBER_HOT, Graphics.FONT_NUMBER_MEDIUM, Graphics.FONT_NUMBER_MILD];
+    }
+
+    hidden function powerRowFonts() as Array<Graphics.FontDefinition> {
+        return standardCellFonts();
+    }
+
+    hidden function fittingFont(
+        dc        as Graphics.Dc,
+        text      as String,
+        cellW     as Number,
+        cellH     as Number,
+        candidates as Array<Graphics.FontDefinition>
+    ) as Graphics.FontDefinition {
+        var horizontalPadding = 6;
+        var verticalPadding   = 4;
+        var maxWidth  = cellW - horizontalPadding;
+        var maxHeight = cellH - verticalPadding;
+
+        for (var i = 0; i < candidates.size(); i += 1) {
+            var font = candidates[i];
+            var dimensions = dc.getTextDimensions(text, font);
+            if ((dimensions[0] <= maxWidth) && (dimensions[1] <= maxHeight)) {
+                return font;
+            }
+        }
+
+        return candidates[candidates.size() - 1];
+    }
+
+    hidden function normalizeFontSize(value as Lang.Object or Null) as Number {
+        var fontSize = valueToNumber(value, FONT_SIZE_LARGE);
+        if ((fontSize == FONT_SIZE_SMALL) || (fontSize == FONT_SIZE_MEDIUM) || (fontSize == FONT_SIZE_LARGE)) {
+            return fontSize;
+        }
+        return FONT_SIZE_LARGE;
     }
 
     hidden function valueToNumber(value as Lang.Object or Null, fallback as Number) as Number {

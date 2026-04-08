@@ -1,0 +1,13 @@
+<settings xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://developer.garmin.com/downloads/connect-iq/resources.xsd">
+    <setting propertyKey="@Properties.ftp" title="@Strings.FtpTitle">
+        <settingConfig type="numeric" />
+    </setting>
+
+    <setting propertyKey="@Properties.font_size" title="@Strings.FontSizeTitle">
+        <settingConfig type="list">
+            <listEntry value="0">@Strings.FontSizeSmall</listEntry>
+            <listEntry value="1">@Strings.FontSizeMedium</listEntry>
+            <listEntry value="2">@Strings.FontSizeLarge</listEntry>
+        </settingConfig>
+    </setting>
+</settings>
