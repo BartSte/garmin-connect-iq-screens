@@ -2,6 +2,11 @@
 
 ## Minimal-7
 
+### v1.2.0
+
+- Numeric fields now use the largest built-in number font that fits their current value while keeping a small cell margin.
+- Removed the font-size setting from app settings.
+
 ### v1.1.0
 
 - Added a user-configurable FTP setting in the app settings. Default: 230 W.

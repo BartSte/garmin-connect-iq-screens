@@ -7,7 +7,7 @@ import Toybox.Lang;
 
 // Minimal7 — full-screen data field for the Garmin Edge Explore 2.
 //
-// Layout (4 equal rows):
+// Layout (power-emphasis):
 //   Row 1: time of day (24 h)  |  activity timer
 //   Row 2: 3-second avg power (W)  — full width, zone-colored background
 //   Row 3: speed (km/h)  |  cadence (rpm)
@@ -24,9 +24,9 @@ const ZONE5_PCT = 105;
 const ZONE6_PCT = 120;
 const ZONE7_PCT = 150;
 
-const FONT_SIZE_SMALL  = 0;
-const FONT_SIZE_MEDIUM = 1;
-const FONT_SIZE_LARGE  = 2;
+const POWER_ROW_HEIGHT_PCT = 34;
+const CELL_HORIZONTAL_PADDING = 4;
+const CELL_VERTICAL_PADDING   = 3;
 
 // ── Background color per zone ─────────────────────────────────────────────
 const ZONE1_COLOR = 0xAAAAAA; // Z1 active recovery  — light gray
@@ -59,14 +59,12 @@ class Minimal7 extends WatchUi.DataField {
     // ── FTP ───────────────────────────────────────────────────────────────
     // mFtp == 0 means no valid FTP is configured; zone colouring is disabled.
     hidden var mFtp as Number = 230;
-    hidden var mFontSize as Number = FONT_SIZE_LARGE;
 
     function initialize() {
         DataField.initialize();
 
         var ftpValue = Application.Properties.getValue("ftp");
         mFtp = valueToNumber(ftpValue, 230);
-        mFontSize = normalizeFontSize(Application.Properties.getValue("font_size"));
     }
 
     // onLayout is intentionally empty.
@@ -113,8 +111,16 @@ class Minimal7 extends WatchUi.DataField {
     function onUpdate(dc as Graphics.Dc) as Void {
         var w     = dc.getWidth();
         var h     = dc.getHeight();
-        var rowH  = h / 4; // integer division — 4 equal rows
-        var row4H = h - rowH * 3; // last row absorbs any remainder pixels
+        var powerRowH = (h * POWER_ROW_HEIGHT_PCT) / 100;
+        var otherRowsH = h - powerRowH;
+        var row1H = otherRowsH / 3;
+        var row3H = otherRowsH / 3;
+        var row4H = h - powerRowH - row1H - row3H; // absorb any remainder
+
+        var row1Y = 0;
+        var row2Y = row1Y + row1H;
+        var row3Y = row2Y + powerRowH;
+        var row4Y = row3Y + row3H;
 
         // Clear the whole field to the device background color.
         var bgColor = getBackgroundColor();
@@ -125,72 +131,73 @@ class Minimal7 extends WatchUi.DataField {
         // getBackgroundColor() calls per frame.
         var fg = defaultFgColor();
 
-        drawRow1(dc, w, rowH,  0,        fg); // time of day | timer
-        drawRow2(dc, w, rowH,  rowH);         // 3s power (zone background)
-        drawRow3(dc, w, rowH,  rowH * 2, fg); // speed | cadence
-        drawRow4(dc, w, row4H, rowH * 3, fg); // ascent | distance
-        drawDividers(dc, w, h, rowH,     fg);
+        drawRow1(dc, w, row1H, row1Y, fg);      // time of day | timer
+        drawPowerRow(dc, w, powerRowH, row2Y);  // 3s power (zone background)
+        drawRow3(dc, w, row3H, row3Y, fg);      // speed | cadence
+        drawRow4(dc, w, row4H, row4Y, fg);      // ascent | distance
+        drawDividers(dc, w, h, row1H, powerRowH, row3Y, row4Y, fg);
     }
 
     // ── Row 1: time of day (left)  |  activity timer (right) ─────────────
     hidden function drawRow1(dc as Graphics.Dc, w as Number, rowH as Number, y as Number, fg as Number) as Void {
         var half    = w / 2;
         var timeStr = mHour.format("%02d") + ":" + mMinute.format("%02d");
-        drawCell(dc, 0,    y, half, rowH, fg, timeStr);
-        drawCell(dc, half, y, half, rowH, fg, formatTimer(mTimerMs));
+        drawCell(dc, 0,    y, half, rowH, fg, null, timeStr);
+        drawCell(dc, half, y, half, rowH, fg, null, formatTimer(mTimerMs));
     }
 
     // ── Row 2: 3-second average power, full width, zone-colored ──────────
-    hidden function drawRow2(dc as Graphics.Dc, w as Number, rowH as Number, y as Number) as Void {
+    hidden function drawPowerRow(dc as Graphics.Dc, w as Number, rowH as Number, y as Number) as Void {
         var pct    = (mFtp > 0) ? (m3sPower * 100 / mFtp) : 0;
         var zoneBg = powerZoneColor(pct);
         var zoneFg = powerZoneTextColor(pct);
         var text   = m3sPower.format("%d");
 
-        dc.setColor(zoneBg, Graphics.COLOR_TRANSPARENT);
-        dc.fillRectangle(0, y, w, rowH);
-
-        dc.setColor(zoneFg, Graphics.COLOR_TRANSPARENT);
-        dc.setClip(0, y, w, rowH);
-        dc.drawText(
-            w / 2, y + rowH / 2,
-            fittingFont(dc, text, w, rowH, powerRowFonts()),
-            text,
-            Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER
-        );
-        dc.clearClip();
+        drawCell(dc, 0, y, w, rowH, zoneFg, zoneBg, text);
     }
 
     // ── Row 3: speed (left)  |  cadence (right) ──────────────────────────
     hidden function drawRow3(dc as Graphics.Dc, w as Number, rowH as Number, y as Number, fg as Number) as Void {
         var half = w / 2;
-        drawCell(dc, 0,    y, half, rowH, fg, mSpeed.format("%.1f"));
-        drawCell(dc, half, y, half, rowH, fg, mCadence.format("%d"));
+        drawCell(dc, 0,    y, half, rowH, fg, null, mSpeed.format("%.1f"));
+        drawCell(dc, half, y, half, rowH, fg, null, mCadence.format("%d"));
     }
 
     // ── Row 4: ascent (left)  |  distance (right) ────────────────────────
     hidden function drawRow4(dc as Graphics.Dc, w as Number, rowH as Number, y as Number, fg as Number) as Void {
         var half = w / 2;
-        drawCell(dc, 0,    y, half, rowH, fg, mAscent.format("%.0f"));
-        drawCell(dc, half, y, half, rowH, fg, mDistanceKm.format("%.2f"));
+        drawCell(dc, 0,    y, half, rowH, fg, null, mAscent.format("%.0f"));
+        drawCell(dc, half, y, half, rowH, fg, null, mDistanceKm.format("%.2f"));
     }
 
     // ── Grid dividers ─────────────────────────────────────────────────────
     // Three horizontal lines at every row boundary.
     // Vertical lines split rows 1, 3, and 4; row 2 (power) is full-width.
-    hidden function drawDividers(dc as Graphics.Dc, w as Number, h as Number, rowH as Number, fg as Number) as Void {
+    hidden function drawDividers(
+        dc as Graphics.Dc,
+        w as Number,
+        h as Number,
+        row1H as Number,
+        row2H as Number,
+        row3Y as Number,
+        row4Y as Number,
+        fg as Number
+    ) as Void {
         dc.setColor(fg, Graphics.COLOR_TRANSPARENT);
 
+        var row2Y = row1H;
+        var row3BoundaryY = row2Y + row2H;
+
         // Horizontal lines
-        dc.drawLine(0, rowH,     w, rowH);      // between rows 1 and 2
-        dc.drawLine(0, rowH * 2, w, rowH * 2);  // between rows 2 and 3
-        dc.drawLine(0, rowH * 3, w, rowH * 3);  // between rows 3 and 4
+        dc.drawLine(0, row2Y,         w, row2Y);         // between rows 1 and 2
+        dc.drawLine(0, row3BoundaryY, w, row3BoundaryY); // between rows 2 and 3
+        dc.drawLine(0, row4Y,         w, row4Y);         // between rows 3 and 4
 
         // Vertical lines (not on the full-width power row)
         var mid = w / 2;
-        dc.drawLine(mid, 0,        mid, rowH);      // row 1 split
-        dc.drawLine(mid, rowH * 2, mid, rowH * 3);  // row 3 split
-        dc.drawLine(mid, rowH * 3, mid, h);          // row 4 split
+        dc.drawLine(mid, 0,             mid, row1H);         // row 1 split
+        dc.drawLine(mid, row3Y,         mid, row4Y);         // row 3 split
+        dc.drawLine(mid, row4Y,         mid, h);             // row 4 split
     }
 
     // ── Helpers ───────────────────────────────────────────────────────────
@@ -203,14 +210,20 @@ class Minimal7 extends WatchUi.DataField {
         w       as Number,
         h       as Number,
         fgColor as Number,
+        bgColor as Number or Null,
         text    as String
     ) as Void {
+        if (bgColor != null) {
+            dc.setColor(bgColor, Graphics.COLOR_TRANSPARENT);
+            dc.fillRectangle(x, y, w, h);
+        }
+
         dc.setColor(fgColor, Graphics.COLOR_TRANSPARENT);
         dc.setClip(x, y, w, h);
         dc.drawText(
             x + w / 2,
             y + h / 2,
-            fittingFont(dc, text, w, h, standardCellFonts()),
+            fittingFont(dc, text, w, h),
             text,
             Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER
         );
@@ -225,30 +238,23 @@ class Minimal7 extends WatchUi.DataField {
     }
 
     hidden function standardCellFonts() as Array<Graphics.FontDefinition> {
-        if (mFontSize == FONT_SIZE_SMALL) {
-            return [Graphics.FONT_NUMBER_MILD];
-        }
-        if (mFontSize == FONT_SIZE_MEDIUM) {
-            return [Graphics.FONT_NUMBER_MEDIUM, Graphics.FONT_NUMBER_MILD];
-        }
-        return [Graphics.FONT_NUMBER_HOT, Graphics.FONT_NUMBER_MEDIUM, Graphics.FONT_NUMBER_MILD];
-    }
-
-    hidden function powerRowFonts() as Array<Graphics.FontDefinition> {
-        return standardCellFonts();
+        return [
+            Graphics.FONT_NUMBER_THAI_HOT,
+            Graphics.FONT_NUMBER_HOT,
+            Graphics.FONT_NUMBER_MEDIUM,
+            Graphics.FONT_NUMBER_MILD
+        ];
     }
 
     hidden function fittingFont(
         dc        as Graphics.Dc,
         text      as String,
         cellW     as Number,
-        cellH     as Number,
-        candidates as Array<Graphics.FontDefinition>
+        cellH     as Number
     ) as Graphics.FontDefinition {
-        var horizontalPadding = 6;
-        var verticalPadding   = 4;
-        var maxWidth  = cellW - horizontalPadding;
-        var maxHeight = cellH - verticalPadding;
+        var maxWidth  = cellW - CELL_HORIZONTAL_PADDING;
+        var maxHeight = cellH - CELL_VERTICAL_PADDING;
+        var candidates = standardCellFonts();
 
         for (var i = 0; i < candidates.size(); i += 1) {
             var font = candidates[i];
@@ -259,14 +265,6 @@ class Minimal7 extends WatchUi.DataField {
         }
 
         return candidates[candidates.size() - 1];
-    }
-
-    hidden function normalizeFontSize(value as Lang.Object or Null) as Number {
-        var fontSize = valueToNumber(value, FONT_SIZE_LARGE);
-        if ((fontSize == FONT_SIZE_SMALL) || (fontSize == FONT_SIZE_MEDIUM) || (fontSize == FONT_SIZE_LARGE)) {
-            return fontSize;
-        }
-        return FONT_SIZE_LARGE;
     }
 
     hidden function valueToNumber(value as Lang.Object or Null, fallback as Number) as Number {

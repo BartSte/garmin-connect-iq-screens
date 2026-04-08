@@ -2,8 +2,4 @@
 <strings>
     <string id="AppName">Minimal 7</string>
     <string id="FtpTitle">FTP (W)</string>
-    <string id="FontSizeTitle">Font size</string>
-    <string id="FontSizeSmall">Small</string>
-    <string id="FontSizeMedium">Medium</string>
-    <string id="FontSizeLarge">Large</string>
 </strings>
