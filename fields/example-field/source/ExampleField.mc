@@ -21,12 +21,7 @@ class ExampleField extends WatchUi.DataField {
 
     // Called once per second during an activity to compute the value.
     function compute(info as Activity.Info) as Void {
-        if (info has :currentSpeed && info.currentSpeed != null) {
-            // currentSpeed is in m/s; convert to km/h
-            mValue = (info.currentSpeed as Float) * 3.6f;
-        } else {
-            mValue = 0.0f;
-        }
+        mValue = ExampleFieldLogic.speedToKph(info has :currentSpeed ? info.currentSpeed : null);
     }
 
     // Called when the field needs to be redrawn.

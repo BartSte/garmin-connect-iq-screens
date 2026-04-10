@@ -152,6 +152,33 @@ with `monkeyc`, and publishes the `.iq` file as a GitHub release.
 
 See the workflow file for key generation instructions.
 
+## Testing
+
+Garmin's official Connect IQ unit-test framework is `Toybox.Test`, and it runs in the simulator.
+
+This repo now keeps testable logic in helper modules and places unit tests directly in each field project:
+
+- [fields/example-field/source/ExampleFieldTests.mc](/home/barts/code/personal/python/garmin-connect-screens/fields/example-field/source/ExampleFieldTests.mc)
+- [fields/minimal-7/source/Minimal7Tests.mc](/home/barts/code/personal/python/garmin-connect-screens/fields/minimal-7/source/Minimal7Tests.mc)
+
+To compile the test-enabled `.prg` files for every field:
+
+```bash
+./scripts/test-fields.sh
+```
+
+To also execute the tests in a running Connect IQ simulator:
+
+```bash
+RUN_SIM_TESTS=1 ./scripts/test-fields.sh
+```
+
+Notes:
+- the script compiles with `monkeyc --unit-test`
+- by default it signs test builds with `./developer_key.der`; override with `DEVELOPER_KEY=/path/to/developer_key.der`
+- `RUN_SIM_TESTS=1` requires the simulator to already be running and reachable by `monkeydo`
+- the default test device is `edgeexplore2`; override it with `DEVICE_ID=<device>`
+
 ## Adding a new field
 
 1. Copy `fields/example-field` to a new folder under `fields/`.
