@@ -1,0 +1,19 @@
+<?xml version="1.0"?>
+<iq:manifest xmlns:iq="http://www.garmin.com/xml/connectiq" version="3">
+    <iq:application id="b31f0d27-472a-41d7-b93f-067de5ecde7c"
+                    name="@Strings.AppName"
+                    minSdkVersion="3.3.0"
+                    type="datafield"
+                    entry="IntervalWorkoutApp"
+                    launcherIcon="@Drawables.LauncherIcon">
+        <iq:products>
+            <iq:product id="edgeexplore2"/>
+        </iq:products>
+        <iq:permissions>
+            <iq:uses-permission id="DataFieldAlert"/>
+        </iq:permissions>
+        <iq:languages>
+            <iq:language>eng</iq:language>
+        </iq:languages>
+    </iq:application>
+</iq:manifest>

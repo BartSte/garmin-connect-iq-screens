@@ -1,5 +1,31 @@
 # CHANGELOG
 
+## Interval Workout
+
+### v0.1.0
+
+- Initial release of the Interval Workout field for the Garmin Edge Explore 2.
+- Added phone-configurable workout settings for:
+  - enabling or disabling the workout field
+  - FTP
+  - sets and repetitions
+  - work, recovery, and between-set recovery durations
+  - work, recovery, and between-set recovery power zones
+- Added a bordered 4-row workout layout showing:
+  - time of day and ride timer
+  - 3s power
+  - interval time left and current zone goal
+  - set progress and repetition progress
+- Added 3-second rolling power guidance with background colors for below target, in target, above target, and unavailable power.
+- Added lap-to-start interval execution with support for:
+  - indefinite warmup before the first lap
+  - single-set and multi-set workouts
+  - indefinite cooldown after the workout completes
+- Added visual transition alerts and device sounds for workout transitions.
+- Kept normal rides unaffected when the field is disabled.
+- Fixed zone-threshold handling so exact FTP boundaries are classified into the correct Coggan zone.
+- Fixed settings reload behavior so workout settings remain editable during warmup and only lock when the first lap starts the interval session.
+
 ## Minimal-7
 
 ### v1.2.0

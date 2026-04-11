@@ -1,0 +1,86 @@
+<settings xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://developer.garmin.com/downloads/connect-iq/resources.xsd">
+    <setting propertyKey="@Properties.enabled" title="@Strings.EnabledTitle">
+        <settingConfig type="boolean" />
+    </setting>
+
+    <setting propertyKey="@Properties.ftp" title="@Strings.FtpTitle">
+        <settingConfig type="numeric" />
+    </setting>
+
+    <setting propertyKey="@Properties.set_count" title="@Strings.SetCountTitle">
+        <settingConfig type="numeric" />
+    </setting>
+
+    <setting propertyKey="@Properties.rep_count" title="@Strings.RepCountTitle">
+        <settingConfig type="numeric" />
+    </setting>
+
+    <setting propertyKey="@Properties.work_value" title="@Strings.WorkValueTitle">
+        <settingConfig type="numeric" />
+    </setting>
+
+    <setting propertyKey="@Properties.work_unit" title="@Strings.WorkUnitTitle">
+        <settingConfig type="list">
+            <listEntry value="1">@Strings.SecondsOption</listEntry>
+            <listEntry value="60">@Strings.MinutesOption</listEntry>
+        </settingConfig>
+    </setting>
+
+    <setting propertyKey="@Properties.recovery_value" title="@Strings.RecoveryValueTitle">
+        <settingConfig type="numeric" />
+    </setting>
+
+    <setting propertyKey="@Properties.recovery_unit" title="@Strings.RecoveryUnitTitle">
+        <settingConfig type="list">
+            <listEntry value="1">@Strings.SecondsOption</listEntry>
+            <listEntry value="60">@Strings.MinutesOption</listEntry>
+        </settingConfig>
+    </setting>
+
+    <setting propertyKey="@Properties.set_recovery_value" title="@Strings.SetRecoveryValueTitle">
+        <settingConfig type="numeric" />
+    </setting>
+
+    <setting propertyKey="@Properties.set_recovery_unit" title="@Strings.SetRecoveryUnitTitle">
+        <settingConfig type="list">
+            <listEntry value="1">@Strings.SecondsOption</listEntry>
+            <listEntry value="60">@Strings.MinutesOption</listEntry>
+        </settingConfig>
+    </setting>
+
+    <setting propertyKey="@Properties.work_zone" title="@Strings.WorkZoneTitle">
+        <settingConfig type="list">
+            <listEntry value="1">@Strings.Zone1Label</listEntry>
+            <listEntry value="2">@Strings.Zone2Label</listEntry>
+            <listEntry value="3">@Strings.Zone3Label</listEntry>
+            <listEntry value="4">@Strings.Zone4Label</listEntry>
+            <listEntry value="5">@Strings.Zone5Label</listEntry>
+            <listEntry value="6">@Strings.Zone6Label</listEntry>
+            <listEntry value="7">@Strings.Zone7Label</listEntry>
+        </settingConfig>
+    </setting>
+
+    <setting propertyKey="@Properties.recovery_zone" title="@Strings.RecoveryZoneTitle">
+        <settingConfig type="list">
+            <listEntry value="1">@Strings.Zone1Label</listEntry>
+            <listEntry value="2">@Strings.Zone2Label</listEntry>
+            <listEntry value="3">@Strings.Zone3Label</listEntry>
+            <listEntry value="4">@Strings.Zone4Label</listEntry>
+            <listEntry value="5">@Strings.Zone5Label</listEntry>
+            <listEntry value="6">@Strings.Zone6Label</listEntry>
+            <listEntry value="7">@Strings.Zone7Label</listEntry>
+        </settingConfig>
+    </setting>
+
+    <setting propertyKey="@Properties.set_recovery_zone" title="@Strings.SetRecoveryZoneTitle">
+        <settingConfig type="list">
+            <listEntry value="1">@Strings.Zone1Label</listEntry>
+            <listEntry value="2">@Strings.Zone2Label</listEntry>
+            <listEntry value="3">@Strings.Zone3Label</listEntry>
+            <listEntry value="4">@Strings.Zone4Label</listEntry>
+            <listEntry value="5">@Strings.Zone5Label</listEntry>
+            <listEntry value="6">@Strings.Zone6Label</listEntry>
+            <listEntry value="7">@Strings.Zone7Label</listEntry>
+        </settingConfig>
+    </setting>
+</settings>

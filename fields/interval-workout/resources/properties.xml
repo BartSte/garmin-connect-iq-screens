@@ -1,0 +1,15 @@
+<properties xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://developer.garmin.com/downloads/connect-iq/resources.xsd">
+    <property id="enabled" type="boolean">false</property>
+    <property id="ftp" type="number">230</property>
+    <property id="set_count" type="number">3</property>
+    <property id="rep_count" type="number">10</property>
+    <property id="work_value" type="number">40</property>
+    <property id="work_unit" type="number">1</property>
+    <property id="recovery_value" type="number">20</property>
+    <property id="recovery_unit" type="number">1</property>
+    <property id="set_recovery_value" type="number">5</property>
+    <property id="set_recovery_unit" type="number">60</property>
+    <property id="work_zone" type="number">5</property>
+    <property id="recovery_zone" type="number">1</property>
+    <property id="set_recovery_zone" type="number">1</property>
+</properties>

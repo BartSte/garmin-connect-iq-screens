@@ -19,10 +19,11 @@ Each subdirectory under `fields/` is a self-contained Connect IQ project that ca
 
 ## Data fields
 
-| Folder | Description |
-|--------|-------------|
-| `minimal-7` | Full-screen field: time, timer, 3s power (zone color), speed, cadence, ascent, distance |
-| `example-field` | Starter template – displays current speed in km/h |
+| Folder             | Description                                                                                                           |
+| ------------------ | --------------------------------------------------------------------------------------------------------------------- |
+| `minimal-7`        | Full-screen field: time, timer, 3s power (zone color), speed, cadence, ascent, distance                               |
+| `interval-workout` | Full-screen interval-training field: bordered workout grid, 3s power guidance, countdown, zone goal, set/rep progress |
+| `example-field`    | Starter template – displays current speed in km/h                                                                     |
 
 ## Getting started
 
@@ -44,6 +45,7 @@ This repo includes bootstrap scripts for the two Linux distros requested here:
 ```
 
 What the scripts do:
+
 - install the base OS packages required here (`curl`, `unzip`, `openssl`, Java runtime, etc.)
 - install [`connect-iq-sdk-manager`](https://github.com/lindell/connect-iq-sdk-manager-cli)
 - add both `~/.local/bin` and the active Connect IQ SDK `bin` directory to your shell startup files
@@ -52,9 +54,26 @@ What the scripts do:
 - download device definitions and simulator fonts for every `fields/*/manifest.xml` in this repo
 
 The scripts assume:
+
 - `sudo` is available
 - you will complete the Garmin login flow when `connect-iq-sdk-manager login` prompts for it
 - you will generate or provide your own `developer_key.der` for signed builds
+
+## Interval workout field
+
+`fields/interval-workout` is a full-screen training field for structured intervals on the **Edge Explore 2**.
+
+Behavior:
+
+- configure the workout from the phone through Garmin Connect Mobile / Connect IQ app settings
+- keep it passive on normal rides by leaving `Enable workout` off
+- start a ride normally, warm up as long as you want, then press the lap button once to start the interval block
+- continue riding normally after the field reaches `DONE`
+
+Important:
+
+- if you use the lap-to-start workflow, disable Garmin `auto-lap` for that ride profile so an automatic lap does not start the workout
+- a dedicated ride page or separate activity profile is the cleanest setup for interval days
 
 ### Build a field
 
@@ -87,6 +106,7 @@ monkeyc \
 ```
 
 Notes:
+
 - `-f` points to the field's `monkey.jungle`
 - `-o` writes the signed output `.prg`
 - `-y` is your `developer_key.der`
@@ -122,6 +142,7 @@ monkeydo fields/minimal-7/bin/minimal-7-edgeexplore2.prg edgeexplore2
 ```
 
 Notes:
+
 - `monkeydo` requires the simulator to already be running
 - the device id must match the field's `manifest.xml`
 - if the field does not launch, rebuild it first with `monkeyc` and check the simulator logs/output
@@ -147,6 +168,7 @@ The CI workflow (`.github/workflows/release.yml`) picks up the tag, compiles the
 with `monkeyc`, and publishes the `.iq` file as a GitHub release.
 
 **Required setup (once):**
+
 - `CIQ_SDK_URL` — repository variable pointing to the Linux Connect IQ SDK zip.
 - `CIQ_DEVELOPER_KEY` — repository secret containing `base64 developer_key.der`.
 
@@ -174,6 +196,7 @@ RUN_SIM_TESTS=1 ./scripts/test-fields.sh
 ```
 
 Notes:
+
 - the script compiles with `monkeyc --unit-test`
 - by default it signs test builds with `./developer_key.der`; override with `DEVELOPER_KEY=/path/to/developer_key.der`
 - `RUN_SIM_TESTS=1` requires the simulator to already be running and reachable by `monkeydo`

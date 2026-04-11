@@ -1,0 +1,26 @@
+<?xml version="1.0"?>
+<strings>
+    <string id="AppName">Interval Workout</string>
+    <string id="EnabledTitle">Enable workout</string>
+    <string id="FtpTitle">FTP (W)</string>
+    <string id="SetCountTitle">Sets</string>
+    <string id="RepCountTitle">Repetitions</string>
+    <string id="WorkValueTitle">Work duration</string>
+    <string id="WorkUnitTitle">Work unit</string>
+    <string id="RecoveryValueTitle">Recovery duration</string>
+    <string id="RecoveryUnitTitle">Recovery unit</string>
+    <string id="SetRecoveryValueTitle">Recovery between sets</string>
+    <string id="SetRecoveryUnitTitle">Set recovery unit</string>
+    <string id="WorkZoneTitle">Work zone</string>
+    <string id="RecoveryZoneTitle">Recovery zone</string>
+    <string id="SetRecoveryZoneTitle">Set recovery zone</string>
+    <string id="SecondsOption">Seconds</string>
+    <string id="MinutesOption">Minutes</string>
+    <string id="Zone1Label">Z1</string>
+    <string id="Zone2Label">Z2</string>
+    <string id="Zone3Label">Z3</string>
+    <string id="Zone4Label">Z4</string>
+    <string id="Zone5Label">Z5</string>
+    <string id="Zone6Label">Z6</string>
+    <string id="Zone7Label">Z7</string>
+</strings>
