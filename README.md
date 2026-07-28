@@ -30,7 +30,7 @@ Each subdirectory under `fields/` is a self-contained Connect IQ project that ca
 1. Install the [Connect IQ SDK](https://developer.garmin.com/connect-iq/sdk/) and VS Code extension (or Eclipse plugin).
 2. Open a field folder (e.g. `fields/example-field`) as your project root.
 3. Build with `monkeyc` or use the IDE's **Run** action against the Edge Explore 2 simulator.
-4. Sideload the generated `.iq` file to your device via Garmin Express or the Connect IQ phone app.
+4. For these private fields, copy the generated `.prg` to `Garmin/Apps/` on the Edge over USB.
 
 ### Linux setup
 
@@ -74,6 +74,24 @@ Important:
 
 - if you use the lap-to-start workflow, disable Garmin `auto-lap` for that ride profile so an automatic lap does not start the workout
 - a dedicated ride page or separate activity profile is the cleanest setup for interval days
+
+## Minimal-7 FTP setting
+
+Minimal-7 exposes its FTP setting directly on the Edge Explore 2. This works for
+the manually sideloaded build and does not require the Connect IQ Store, Garmin
+Connect, or Garmin Express.
+
+1. Build `fields/minimal-7/bin/minimal-7-edgeexplore2.prg`.
+2. Connect the Edge over USB and copy the `.prg` to `Garmin/Apps/`.
+3. Disconnect the Edge and open the Connect IQ data-field settings for Minimal-7
+   from the activity profile.
+4. Tap the FTP screen, scroll to a value from 50 W through 600 W, and accept it.
+
+The accepted FTP is stored in the app's local properties and remains available
+after the Edge restarts. Further FTP changes happen entirely on the Edge; they do
+not require another build, phone synchronization, or USB connection. Keep the
+application UUID in `fields/minimal-7/manifest.xml` unchanged when rebuilding so
+the new `.prg` uses the same property storage.
 
 ### Build a field
 

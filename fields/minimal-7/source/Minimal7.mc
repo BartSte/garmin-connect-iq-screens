@@ -41,15 +41,18 @@ class Minimal7 extends WatchUi.DataField {
 
     // ── FTP ───────────────────────────────────────────────────────────────
     // mFtp == 0 means no valid FTP is configured; zone colouring is disabled.
-    hidden var mFtp as Number = 230;
+    hidden var mFtp as Number = MINIMAL7_DEFAULT_FTP;
     hidden var mCadenceMin as Number = 80;
     hidden var mCadenceMax as Number = 95;
 
     function initialize() {
         DataField.initialize();
+        loadSettings();
+    }
 
+    function loadSettings() as Void {
         var ftpValue = Application.Properties.getValue("ftp");
-        mFtp = Minimal7Logic.valueToNumber(ftpValue, 230);
+        mFtp = Minimal7Logic.valueToNumber(ftpValue, MINIMAL7_DEFAULT_FTP);
 
         var cadenceMin = Minimal7Logic.valueToNumber(Application.Properties.getValue("cadence_min"), 80);
         var cadenceMax = Minimal7Logic.valueToNumber(Application.Properties.getValue("cadence_max"), 95);

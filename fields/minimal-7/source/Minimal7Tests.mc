@@ -49,3 +49,24 @@ function minimal7PowerBufferRollsAcrossSamples(logger as Test.Logger) as Lang.Bo
         && result3[:nextIndex] == 0
         && result3[:sampleCount] == 3;
 }
+
+(:test)
+function minimal7FtpPickerMapsIndexesAndValues(logger as Test.Logger) as Lang.Boolean {
+    logger.debug("Checking FTP picker size and index/value mapping");
+    var factory = new Minimal7FtpPickerFactory();
+    return factory.getSize() == 551
+        && factory.getIndex(50) == 0
+        && factory.getIndex(230) == 180
+        && factory.getIndex(600) == 550
+        && (factory.getValue(0) as Number) == 50
+        && (factory.getValue(180) as Number) == 230
+        && (factory.getValue(550) as Number) == 600;
+}
+
+(:test)
+function minimal7FtpPickerClampsInitialValue(logger as Test.Logger) as Lang.Boolean {
+    logger.debug("Checking FTP picker initial-value clamping");
+    var factory = new Minimal7FtpPickerFactory();
+    return factory.getIndex(49) == 0
+        && factory.getIndex(601) == 550;
+}
