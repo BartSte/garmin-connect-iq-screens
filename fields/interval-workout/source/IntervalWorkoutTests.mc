@@ -1,11 +1,53 @@
+import Toybox.Graphics;
 import Toybox.Lang;
 import Toybox.Test;
 
+(:debug)
+function intervalWorkoutTestSettings(
+    setCount as Number,
+    repCount as Number,
+    workSecs as Number,
+    recoverySecs as Number,
+    setRecoverySecs as Number,
+    workZone as Number,
+    recoveryZone as Number,
+    setRecoveryZone as Number
+) as Dictionary {
+    return IntervalWorkoutLogic.normalizeSettings({
+        :ftp => 250,
+        :set_count => setCount,
+        :rep_count => repCount,
+        :work_value => workSecs,
+        :work_unit => 1,
+        :recovery_value => recoverySecs,
+        :recovery_unit => 1,
+        :set_recovery_value => setRecoverySecs,
+        :set_recovery_unit => 1,
+        :work_zone => workZone,
+        :recovery_zone => recoveryZone,
+        :set_recovery_zone => setRecoveryZone
+    });
+}
+
 (:test)
-function intervalWorkoutNormalizesSettings(logger as Test.Logger) as Lang.Boolean {
+function intervalWorkoutUsesFreshInstallDefaults(logger as Test.Logger) as Lang.Boolean {
+    logger.debug("Checking fresh-install defaults");
+    var settings = IntervalWorkoutLogic.defaultSettings();
+    return (settings[:ftp] == 248)
+        && (settings[:setCount] == 3)
+        && (settings[:repCount] == 10)
+        && (settings[:workSecs] == 40)
+        && (settings[:recoverySecs] == 20)
+        && (settings[:setRecoverySecs] == 240)
+        && (settings[:workZone] == 5)
+        && (settings[:recoveryZone] == 1)
+        && (settings[:setRecoveryZone] == 1);
+}
+
+(:test)
+function intervalWorkoutNormalizesLegacyDurationUnits(logger as Test.Logger) as Lang.Boolean {
     logger.debug("Checking settings normalization");
     var settings = IntervalWorkoutLogic.normalizeSettings({
-        :enabled => true,
         :ftp => 250,
         :set_count => 3,
         :rep_count => 10,
@@ -20,32 +62,38 @@ function intervalWorkoutNormalizesSettings(logger as Test.Logger) as Lang.Boolea
         :set_recovery_zone => "2"
     });
 
-    return settings[:enabled]
-        && (settings[:ftp] == 250)
+    return (settings[:ftp] == 250)
         && (settings[:setRecoverySecs] == 300)
         && (settings[:workZone] == 5)
         && settings[:valid];
 }
 
 (:test)
-function intervalWorkoutRejectsInvalidFtp(logger as Test.Logger) as Lang.Boolean {
-    logger.debug("Checking invalid FTP");
-    var settings = IntervalWorkoutLogic.normalizeSettings({
-        :enabled => true,
+function intervalWorkoutRejectsInvalidRequiredSettings(logger as Test.Logger) as Lang.Boolean {
+    logger.debug("Checking required-setting validation");
+    var normalizedFtp = IntervalWorkoutLogic.normalizeSettings({
         :ftp => 0,
         :set_count => 1,
         :rep_count => 1,
-        :work_value => 1,
-        :work_unit => "minutes",
-        :recovery_value => 1,
-        :recovery_unit => "minutes",
+        :work_value => 40,
+        :work_unit => 1,
+        :recovery_value => 20,
+        :recovery_unit => 1,
         :set_recovery_value => 0,
-        :set_recovery_unit => "seconds",
-        :work_zone => "4",
-        :recovery_zone => "1",
-        :set_recovery_zone => "1"
+        :set_recovery_unit => 1,
+        :work_zone => 5,
+        :recovery_zone => 1,
+        :set_recovery_zone => 1
     });
-    return !settings[:valid] && (settings[:error] == "FTP");
+    var invalidWork = intervalWorkoutTestSettings(1, 1, 0, 20, 0, 5, 1, 1);
+    var invalidRecovery = intervalWorkoutTestSettings(1, 1, 40, 0, 0, 5, 1, 1);
+
+    return !normalizedFtp[:valid]
+        && (normalizedFtp[:error] == "FTP")
+        && !invalidWork[:valid]
+        && (invalidWork[:error] == "WORK")
+        && !invalidRecovery[:valid]
+        && (invalidRecovery[:error] == "REC");
 }
 
 (:test)
@@ -53,6 +101,9 @@ function intervalWorkoutFormatsTimers(logger as Test.Logger) as Lang.Boolean {
     logger.debug("Checking timer formatting");
     return (IntervalWorkoutLogic.formatRideTimer(495000) == "08:15")
         && (IntervalWorkoutLogic.formatCountdown(20000) == "00:20")
+        && (IntervalWorkoutLogic.formatStartCountdown(5000) == "5")
+        && (IntervalWorkoutLogic.formatStartCountdown(4001) == "5")
+        && (IntervalWorkoutLogic.formatDuration(240) == "4:00")
         && (IntervalWorkoutLogic.formatClock(7, 30) == "07:30");
 }
 
@@ -62,112 +113,233 @@ function intervalWorkoutTracksPowerAverage(logger as Test.Logger) as Lang.Boolea
     var one = IntervalWorkoutLogic.pushPowerSample([0, 0, 0], 0, 0, 210);
     var two = IntervalWorkoutLogic.pushPowerSample(one[:buffer], one[:nextIndex], one[:sampleCount], 240);
     var three = IntervalWorkoutLogic.pushPowerSample(two[:buffer], two[:nextIndex], two[:sampleCount], 300);
-    return (three[:average] == 250) && (three[:sampleCount] == 3);
+    return (one[:average] == 210)
+        && (three[:average] == 250)
+        && (three[:sampleCount] == 3);
 }
 
 (:test)
-function intervalWorkoutAdvancesWithinSingleSet(logger as Test.Logger) as Lang.Boolean {
-    logger.debug("Checking single-set progression");
-    var settings = IntervalWorkoutLogic.normalizeSettings({
-        :enabled => true,
-        :ftp => 250,
-        :set_count => 1,
-        :rep_count => 2,
-        :work_value => 40,
-        :work_unit => "seconds",
-        :recovery_value => 20,
-        :recovery_unit => "seconds",
-        :set_recovery_value => 0,
-        :set_recovery_unit => "seconds",
-        :work_zone => "5",
-        :recovery_zone => "1",
-        :set_recovery_zone => "1"
-    });
-    var state = IntervalWorkoutLogic.startWorkState(1, 1, settings);
-    var afterWork = IntervalWorkoutLogic.applyElapsed(state, settings, 40000);
-    var afterWorkState = afterWork[:state] as Dictionary;
-    var afterRecovery = IntervalWorkoutLogic.applyElapsed(afterWorkState, settings, 20000);
-    var afterRecoveryState = afterRecovery[:state] as Dictionary;
-    return (afterWorkState[:phase] == INTERVAL_PHASE_RECOVERY)
-        && (afterRecoveryState[:phase] == INTERVAL_PHASE_WORK)
-        && (afterRecoveryState[:currentRep] == 2);
+function intervalWorkoutStartsAndCancelsCountdownWithTap(logger as Test.Logger) as Lang.Boolean {
+    logger.debug("Checking tap-to-start countdown");
+    var settings = intervalWorkoutTestSettings(1, 1, 40, 20, 0, 5, 1, 1);
+    var ready = IntervalWorkoutLogic.readyState(settings);
+    var pausedTap = IntervalWorkoutLogic.applyTap(ready, settings, false);
+    var started = IntervalWorkoutLogic.applyTap(ready, settings, true);
+    var startedState = started[:state] as Dictionary;
+    var cancelled = IntervalWorkoutLogic.applyTap(startedState, settings, true);
+    var cancelledState = cancelled[:state] as Dictionary;
+
+    return ((pausedTap[:state] as Dictionary)[:phase] == INTERVAL_PHASE_READY)
+        && !pausedTap[:sessionLocked]
+        && (startedState[:phase] == INTERVAL_PHASE_STARTING)
+        && (startedState[:remainingMs] == 5000)
+        && started[:sessionLocked]
+        && started[:started]
+        && (cancelledState[:phase] == INTERVAL_PHASE_READY)
+        && !cancelled[:sessionLocked]
+        && cancelled[:cancelled];
 }
 
 (:test)
-function intervalWorkoutAdvancesAcrossSets(logger as Test.Logger) as Lang.Boolean {
-    logger.debug("Checking set recovery progression");
-    var settings = IntervalWorkoutLogic.normalizeSettings({
-        :enabled => true,
-        :ftp => 250,
-        :set_count => 2,
-        :rep_count => 1,
-        :work_value => 40,
-        :work_unit => "seconds",
-        :recovery_value => 20,
-        :recovery_unit => "seconds",
-        :set_recovery_value => 5,
-        :set_recovery_unit => "minutes",
-        :work_zone => "5",
-        :recovery_zone => "1",
-        :set_recovery_zone => "2"
-    });
+function intervalWorkoutCountdownUsesActivityTimerDelta(logger as Test.Logger) as Lang.Boolean {
+    logger.debug("Checking countdown advancement and pause");
+    var settings = intervalWorkoutTestSettings(1, 1, 40, 20, 0, 5, 1, 1);
+    var countdown = IntervalWorkoutLogic.startCountdownState();
+    var paused = IntervalWorkoutLogic.applyElapsed(countdown, settings, 0);
+    var pausedState = paused[:state] as Dictionary;
+    var advanced = IntervalWorkoutLogic.applyElapsed(countdown, settings, 5000);
+    var advancedState = advanced[:state] as Dictionary;
+    var transitions = advanced[:transitions] as Array;
+
+    return (pausedState[:phase] == INTERVAL_PHASE_STARTING)
+        && (pausedState[:remainingMs] == 5000)
+        && (advancedState[:phase] == INTERVAL_PHASE_WORK)
+        && (advancedState[:remainingMs] == 40000)
+        && (transitions.size() == 1)
+        && (transitions[0] == INTERVAL_PHASE_WORK);
+}
+
+(:test)
+function intervalWorkoutIgnoresTapsAfterCountdown(logger as Test.Logger) as Lang.Boolean {
+    logger.debug("Checking ignored active and complete taps");
+    var settings = intervalWorkoutTestSettings(1, 1, 40, 20, 0, 5, 1, 1);
+    var work = IntervalWorkoutLogic.startWorkState(1, 1, settings);
+    var activeTap = IntervalWorkoutLogic.applyTap(work, settings, true);
+    var activeState = activeTap[:state] as Dictionary;
+    var complete = IntervalWorkoutLogic.completeState(work);
+    var completeTap = IntervalWorkoutLogic.applyTap(complete, settings, true);
+    var completeAfterTap = completeTap[:state] as Dictionary;
+
+    return (activeState[:phase] == INTERVAL_PHASE_WORK)
+        && (activeState[:remainingMs] == 40000)
+        && activeTap[:sessionLocked]
+        && (completeAfterTap[:phase] == INTERVAL_PHASE_COMPLETE)
+        && completeTap[:sessionLocked]
+        && !activeTap[:started]
+        && !activeTap[:cancelled];
+}
+
+(:test)
+function intervalWorkoutRunsThresholdSequence(logger as Test.Logger) as Lang.Boolean {
+    logger.debug("Checking 3 x 20-minute threshold sequence");
+    var settings = intervalWorkoutTestSettings(1, 3, 1200, 300, 0, 4, 1, 1);
     var state = IntervalWorkoutLogic.startWorkState(1, 1, settings);
-    var afterWork = IntervalWorkoutLogic.applyElapsed(state, settings, 40000);
-    var afterWorkState = afterWork[:state] as Dictionary;
-    var afterRecovery = IntervalWorkoutLogic.applyElapsed(afterWorkState, settings, 20000);
-    var afterRecoveryState = afterRecovery[:state] as Dictionary;
-    var afterSetRecovery = IntervalWorkoutLogic.applyElapsed(afterRecoveryState, settings, 300000);
-    var afterSetRecoveryState = afterSetRecovery[:state] as Dictionary;
-    return (afterRecoveryState[:phase] == INTERVAL_PHASE_SET_RECOVERY)
-        && (afterRecoveryState[:currentSet] == 2)
-        && (afterSetRecoveryState[:phase] == INTERVAL_PHASE_WORK)
-        && (afterSetRecoveryState[:currentSet] == 2);
+    var afterFirstWork = IntervalWorkoutLogic.applyElapsed(state, settings, 1200000);
+    var firstRecovery = afterFirstWork[:state] as Dictionary;
+    var complete = IntervalWorkoutLogic.applyElapsed(state, settings, 4500000);
+    var completeState = complete[:state] as Dictionary;
+
+    return (firstRecovery[:phase] == INTERVAL_PHASE_RECOVERY)
+        && (firstRecovery[:remainingMs] == 300000)
+        && (IntervalWorkoutLogic.targetZoneForPhase(settings, firstRecovery[:phase]) == 1)
+        && (completeState[:phase] == INTERVAL_PHASE_COMPLETE)
+        && (completeState[:currentRep] == 3);
+}
+
+(:test)
+function intervalWorkoutSetRecoveryReplacesRepRecovery(logger as Test.Logger) as Lang.Boolean {
+    logger.debug("Checking exact recovery between sets");
+    var settings = intervalWorkoutTestSettings(3, 10, 40, 20, 240, 5, 1, 1);
+    var lastWorkInSet = IntervalWorkoutLogic.startWorkState(1, 10, settings);
+    var afterWork = IntervalWorkoutLogic.applyElapsed(lastWorkInSet, settings, 40000);
+    var setRecovery = afterWork[:state] as Dictionary;
+    var almostFinished = IntervalWorkoutLogic.applyElapsed(setRecovery, settings, 239999);
+    var almostFinishedState = almostFinished[:state] as Dictionary;
+    var nextSet = IntervalWorkoutLogic.applyElapsed(setRecovery, settings, 240000);
+    var nextSetState = nextSet[:state] as Dictionary;
+
+    return (setRecovery[:phase] == INTERVAL_PHASE_SET_RECOVERY)
+        && (setRecovery[:currentSet] == 2)
+        && (setRecovery[:remainingMs] == 240000)
+        && (almostFinishedState[:phase] == INTERVAL_PHASE_SET_RECOVERY)
+        && (almostFinishedState[:remainingMs] == 1)
+        && (nextSetState[:phase] == INTERVAL_PHASE_WORK)
+        && (nextSetState[:currentSet] == 2)
+        && (nextSetState[:currentRep] == 1);
+}
+
+(:test)
+function intervalWorkoutRunsFullVo2Sequence(logger as Test.Logger) as Lang.Boolean {
+    logger.debug("Checking 3 x 10 x 40/20 VO2 sequence");
+    var settings = intervalWorkoutTestSettings(3, 10, 40, 20, 240, 5, 1, 1);
+    var state = IntervalWorkoutLogic.startWorkState(1, 1, settings);
+    var result = IntervalWorkoutLogic.applyElapsed(state, settings, 2240000);
+    var finalState = result[:state] as Dictionary;
+
+    return (finalState[:phase] == INTERVAL_PHASE_COMPLETE)
+        && (finalState[:currentSet] == 3)
+        && (finalState[:currentRep] == 10);
+}
+
+(:test)
+function intervalWorkoutSkipsZeroSetRecovery(logger as Test.Logger) as Lang.Boolean {
+    logger.debug("Checking zero set recovery");
+    var settings = intervalWorkoutTestSettings(2, 1, 40, 20, 0, 5, 1, 1);
+    var state = IntervalWorkoutLogic.startWorkState(1, 1, settings);
+    var result = IntervalWorkoutLogic.applyElapsed(state, settings, 40000);
+    var nextState = result[:state] as Dictionary;
+
+    return (nextState[:phase] == INTERVAL_PHASE_WORK)
+        && (nextState[:currentSet] == 2)
+        && (nextState[:currentRep] == 1)
+        && (nextState[:remainingMs] == 40000);
 }
 
 (:test)
 function intervalWorkoutCompletesAfterFinalRecovery(logger as Test.Logger) as Lang.Boolean {
-    logger.debug("Checking complete state");
-    var settings = IntervalWorkoutLogic.normalizeSettings({
-        :enabled => true,
-        :ftp => 250,
-        :set_count => 1,
-        :rep_count => 1,
-        :work_value => 40,
-        :work_unit => "seconds",
-        :recovery_value => 20,
-        :recovery_unit => "seconds",
-        :set_recovery_value => 0,
-        :set_recovery_unit => "seconds",
-        :work_zone => "5",
-        :recovery_zone => "1",
-        :set_recovery_zone => "1"
-    });
+    logger.debug("Checking final normal recovery");
+    var settings = intervalWorkoutTestSettings(1, 1, 40, 20, 0, 5, 1, 1);
     var state = IntervalWorkoutLogic.startWorkState(1, 1, settings);
     var afterWork = IntervalWorkoutLogic.applyElapsed(state, settings, 40000);
     var afterWorkState = afterWork[:state] as Dictionary;
     var afterRecovery = IntervalWorkoutLogic.applyElapsed(afterWorkState, settings, 20000);
     var afterRecoveryState = afterRecovery[:state] as Dictionary;
-    return afterRecoveryState[:phase] == INTERVAL_PHASE_COMPLETE;
+
+    return (afterWorkState[:phase] == INTERVAL_PHASE_RECOVERY)
+        && (afterWorkState[:remainingMs] == 20000)
+        && (afterRecoveryState[:phase] == INTERVAL_PHASE_COMPLETE);
 }
 
 (:test)
-function intervalWorkoutDetectsPowerCompliance(logger as Test.Logger) as Lang.Boolean {
-    logger.debug("Checking power-zone compliance");
-    var below = IntervalWorkoutLogic.powerCompliance(120, 250, 4, true);
-    var inside = IntervalWorkoutLogic.powerCompliance(250, 250, 4, true);
-    var above = IntervalWorkoutLogic.powerCompliance(500, 250, 4, true);
-    return (below == INTERVAL_POWER_BELOW)
-        && (inside == INTERVAL_POWER_IN)
-        && (above == INTERVAL_POWER_ABOVE);
+function intervalWorkoutUsesMinimal7ZoneColors(logger as Test.Logger) as Lang.Boolean {
+    logger.debug("Checking exact Minimal-7 zone colors");
+    return (IntervalWorkoutLogic.powerZoneColor(0) == INTERVAL_ZONE1_COLOR)
+        && (IntervalWorkoutLogic.powerZoneColor(55) == INTERVAL_ZONE2_COLOR)
+        && (IntervalWorkoutLogic.powerZoneColor(75) == INTERVAL_ZONE3_COLOR)
+        && (IntervalWorkoutLogic.powerZoneColor(90) == INTERVAL_ZONE4_COLOR)
+        && (IntervalWorkoutLogic.powerZoneColor(105) == INTERVAL_ZONE5_COLOR)
+        && (IntervalWorkoutLogic.powerZoneColor(120) == INTERVAL_ZONE6_COLOR)
+        && (IntervalWorkoutLogic.powerZoneColor(150) == INTERVAL_ZONE7_COLOR)
+        && (IntervalWorkoutLogic.powerZoneTextColor(54) == Graphics.COLOR_BLACK)
+        && (IntervalWorkoutLogic.powerZoneTextColor(55) == Graphics.COLOR_WHITE)
+        && (IntervalWorkoutLogic.powerZoneTextColor(75) == Graphics.COLOR_BLACK)
+        && (IntervalWorkoutLogic.powerZoneTextColor(120) == Graphics.COLOR_WHITE);
 }
 
 (:test)
-function intervalWorkoutTreatsThresholdsAsInclusive(logger as Test.Logger) as Lang.Boolean {
-    logger.debug("Checking inclusive zone thresholds");
-    return (IntervalWorkoutLogic.zoneBandFromPct(55) == 2)
-        && (IntervalWorkoutLogic.zoneBandFromPct(75) == 3)
-        && (IntervalWorkoutLogic.zoneBandFromPct(90) == 4)
-        && (IntervalWorkoutLogic.zoneBandFromPct(105) == 5)
-        && (IntervalWorkoutLogic.zoneBandFromPct(120) == 6)
-        && (IntervalWorkoutLogic.zoneBandFromPct(150) == 7);
+function intervalWorkoutHandlesUnavailablePower(logger as Test.Logger) as Lang.Boolean {
+    logger.debug("Checking actual-power colors and unavailable power");
+    var unavailable = IntervalWorkoutLogic.actualPowerColors(0, 248, false);
+    var invalidFtp = IntervalWorkoutLogic.actualPowerColors(250, 0, true);
+    var zoneFour = IntervalWorkoutLogic.actualPowerColors(225, 250, true);
+
+    return (unavailable[:background] == INTERVAL_POWER_UNKNOWN_COLOR)
+        && (unavailable[:foreground] == Graphics.COLOR_WHITE)
+        && (invalidFtp[:background] == INTERVAL_POWER_UNKNOWN_COLOR)
+        && (zoneFour[:background] == INTERVAL_ZONE4_COLOR)
+        && (zoneFour[:foreground] == Graphics.COLOR_BLACK);
+}
+
+(:test)
+function intervalWorkoutShowsRequestedZoneForCurrentPhase(logger as Test.Logger) as Lang.Boolean {
+    logger.debug("Checking requested-zone badge values");
+    var settings = intervalWorkoutTestSettings(1, 1, 40, 20, 0, 5, 2, 1);
+    return (IntervalWorkoutLogic.targetZoneForPhase(settings, INTERVAL_PHASE_READY) == 5)
+        && (IntervalWorkoutLogic.targetZoneForPhase(settings, INTERVAL_PHASE_STARTING) == 5)
+        && (IntervalWorkoutLogic.targetZoneForPhase(settings, INTERVAL_PHASE_WORK) == 5)
+        && (IntervalWorkoutLogic.targetZoneForPhase(settings, INTERVAL_PHASE_RECOVERY) == 2)
+        && (IntervalWorkoutLogic.targetZoneForPhase(settings, INTERVAL_PHASE_SET_RECOVERY) == 1)
+        && (IntervalWorkoutLogic.targetZoneForPhase(settings, INTERVAL_PHASE_COMPLETE) == null);
+}
+
+(:test)
+function intervalWorkoutPickerBoundsAndMappings(logger as Test.Logger) as Lang.Boolean {
+    logger.debug("Checking picker bounds and index/value mappings");
+    var ftp = new IntervalWorkoutNumberPickerFactory(50, 600, INTERVAL_PICKER_FTP);
+    var sets = new IntervalWorkoutNumberPickerFactory(1, 20, INTERVAL_PICKER_PLAIN);
+    var reps = new IntervalWorkoutNumberPickerFactory(1, 100, INTERVAL_PICKER_PLAIN);
+    var minutes = new IntervalWorkoutNumberPickerFactory(0, 120, INTERVAL_PICKER_PLAIN);
+    var seconds = new IntervalWorkoutNumberPickerFactory(0, 59, INTERVAL_PICKER_SECONDS);
+    var zones = new IntervalWorkoutNumberPickerFactory(1, 7, INTERVAL_PICKER_ZONE);
+
+    return (ftp.getSize() == 551)
+        && (ftp.getIndex(49) == 0)
+        && (ftp.getIndex(601) == 550)
+        && ((ftp.getValue(198) as Number) == 248)
+        && (sets.getSize() == 20)
+        && (reps.getSize() == 100)
+        && (minutes.getSize() == 121)
+        && (seconds.getSize() == 60)
+        && (zones.getSize() == 7)
+        && ((zones.getValue(4) as Number) == 5);
+}
+
+(:test)
+function intervalWorkoutDurationPickerEncoding(logger as Test.Logger) as Lang.Boolean {
+    logger.debug("Checking duration picker encoding and validation");
+    var maximum = IntervalWorkoutSettings.durationParts(99999);
+    var minimum = IntervalWorkoutSettings.durationParts(-1);
+    var encoded = IntervalWorkoutSettings.durationPropertyValues(
+        IntervalWorkoutSettings.durationFromParts(4, 20)
+    );
+
+    return (maximum[:minutes] == 120)
+        && (maximum[:seconds] == 59)
+        && (minimum[:minutes] == 0)
+        && (minimum[:seconds] == 0)
+        && (encoded[:value] == 260)
+        && (encoded[:unit] == 1)
+        && !IntervalWorkoutSettings.durationIsValid(0, false)
+        && IntervalWorkoutSettings.durationIsValid(1, false)
+        && IntervalWorkoutSettings.durationIsValid(0, true);
 }

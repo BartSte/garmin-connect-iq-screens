@@ -1,8 +1,4 @@
 <settings xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://developer.garmin.com/downloads/connect-iq/resources.xsd">
-    <setting propertyKey="@Properties.enabled" title="@Strings.EnabledTitle">
-        <settingConfig type="boolean" />
-    </setting>
-
     <setting propertyKey="@Properties.ftp" title="@Strings.FtpTitle">
         <settingConfig type="numeric" />
     </setting>

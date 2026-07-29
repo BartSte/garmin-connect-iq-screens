@@ -1,6 +1,5 @@
 import Toybox.Activity;
 import Toybox.Attention;
-import Toybox.Application;
 import Toybox.Graphics;
 import Toybox.Lang;
 import Toybox.System;
@@ -42,6 +41,7 @@ class IntervalWorkout extends WatchUi.DataField {
     hidden var mMinute as Number = 0;
     hidden var mTimerMs as Number = 0;
     hidden var mLastTimerMs as Number = 0;
+    hidden var mTimerRunning as Boolean = false;
     hidden var mSessionLocked as Boolean = false;
     hidden var mSettingsDirty as Boolean = true;
     hidden var mPendingSettingsDirty as Boolean = false;
@@ -55,36 +55,70 @@ class IntervalWorkout extends WatchUi.DataField {
     function initialize() {
         DataField.initialize();
         loadSettings();
+        mSettingsDirty = false;
         syncIdlePhase();
     }
 
     function handleSettingsChanged() as Void {
+        mSettingsDirty = true;
         if (mSessionLocked) {
             mPendingSettingsDirty = true;
             return;
         }
-        mSettingsDirty = true;
+        maybeReloadSettings();
+        syncIdlePhase();
+    }
+
+    function handleTap() as Boolean {
+        maybeReloadSettings();
+
+        var result = IntervalWorkoutLogic.applyTap(mState, mSettings, mTimerRunning);
+        mState = result[:state];
+        mSessionLocked = result[:sessionLocked];
+
+        if (result[:started]) {
+            mLastTimerMs = mTimerMs;
+        } else if (result[:cancelled]) {
+            if (mPendingSettingsDirty) {
+                mSettingsDirty = true;
+            }
+            mPendingSettingsDirty = false;
+            maybeReloadSettings();
+            syncIdlePhase();
+        }
+
+        WatchUi.requestUpdate();
+        return true;
     }
 
     function onLayout(dc as Graphics.Dc) as Void {
     }
 
     function onTimerReset() as Void {
-        mState = IntervalWorkoutLogic.defaultSessionState();
+        mTimerMs = 0;
         mLastTimerMs = 0;
+        mTimerRunning = false;
         mSessionLocked = false;
         mSettingsDirty = true;
         mPendingSettingsDirty = false;
+        maybeReloadSettings();
         syncIdlePhase();
     }
 
-    function onTimerLap() as Void {
-        if (mState[:phase] == INTERVAL_PHASE_ARMED) {
-            maybeReloadSettings();
-            mState = IntervalWorkoutLogic.startWorkState(1, 1, mSettings);
-            mSessionLocked = true;
-            emitAlertForPhase(mState[:phase]);
-        }
+    function onTimerStart() as Void {
+        mTimerRunning = true;
+    }
+
+    function onTimerResume() as Void {
+        mTimerRunning = true;
+    }
+
+    function onTimerPause() as Void {
+        mTimerRunning = false;
+    }
+
+    function onTimerStop() as Void {
+        mTimerRunning = false;
     }
 
     function compute(info as Activity.Info) as Void {
@@ -97,12 +131,12 @@ class IntervalWorkout extends WatchUi.DataField {
 
         updatePower(info);
 
-        if (!mSessionLocked && mSettings[:enabled] && mSettings[:valid] && (mTimerMs > 0)) {
-            mState = IntervalWorkoutLogic.beginArmedState(mSettings);
+        var deltaMs = mTimerMs - mLastTimerMs;
+        if (deltaMs > 0) {
+            mTimerRunning = true;
         }
 
         if (mSessionLocked && IntervalWorkoutLogic.isTimedPhase(mState[:phase])) {
-            var deltaMs = mTimerMs - mLastTimerMs;
             if (deltaMs > 0) {
                 var advanced = IntervalWorkoutLogic.applyElapsed(mState, mSettings, deltaMs);
                 mState = advanced[:state];
@@ -137,13 +171,25 @@ class IntervalWorkout extends WatchUi.DataField {
         dc.clear();
 
         var fg = defaultFgColor();
-        var powerCompliance = currentPowerCompliance();
-        var powerBg = IntervalWorkoutLogic.powerBgColor(powerCompliance);
-        var powerFg = IntervalWorkoutLogic.powerFgColor(powerCompliance);
+        var powerColors = IntervalWorkoutLogic.actualPowerColors(
+            m3sPower,
+            mSettings[:ftp],
+            mHasPower
+        );
+        var targetZone = currentTargetZone();
 
         drawRow(dc, 0, row1Y, w, row1H, fg, null, currentClockText(), IntervalWorkoutLogic.formatRideTimer(mTimerMs));
-        drawPowerRow(dc, 0, row2Y, w, row2H, powerFg, powerBg, currentPowerText());
-        drawRow(dc, 0, row3Y, w, row3H, fg, null, intervalTimeText(), targetZoneText());
+        drawPowerRow(
+            dc,
+            0,
+            row2Y,
+            w,
+            row2H,
+            powerColors[:foreground],
+            powerColors[:background],
+            currentPowerText()
+        );
+        drawStatusRow(dc, 0, row3Y, w, row3H, fg, intervalTimeText(), targetZone);
         drawRow(dc, 0, row4Y, w, row4H, fg, null, setProgressText(), repProgressText());
         drawBorders(dc, w, h, row1H, row2Y + row2H, row4Y, fg);
     }
@@ -156,51 +202,13 @@ class IntervalWorkout extends WatchUi.DataField {
     }
 
     hidden function loadSettings() as Void {
-        var raw = {
-            :enabled => Application.Properties.getValue("enabled"),
-            :ftp => Application.Properties.getValue("ftp"),
-            :set_count => Application.Properties.getValue("set_count"),
-            :rep_count => Application.Properties.getValue("rep_count"),
-            :work_value => Application.Properties.getValue("work_value"),
-            :work_unit => Application.Properties.getValue("work_unit"),
-            :recovery_value => Application.Properties.getValue("recovery_value"),
-            :recovery_unit => Application.Properties.getValue("recovery_unit"),
-            :set_recovery_value => Application.Properties.getValue("set_recovery_value"),
-            :set_recovery_unit => Application.Properties.getValue("set_recovery_unit"),
-            :work_zone => Application.Properties.getValue("work_zone"),
-            :recovery_zone => Application.Properties.getValue("recovery_zone"),
-            :set_recovery_zone => Application.Properties.getValue("set_recovery_zone")
-        };
-        mSettings = IntervalWorkoutLogic.normalizeSettings(raw);
+        mSettings = IntervalWorkoutSettings.load();
     }
 
     hidden function syncIdlePhase() as Void {
-        if (!mSettings[:enabled]) {
-            mState = {
-                :phase => INTERVAL_PHASE_DISABLED,
-                :currentSet => 1,
-                :currentRep => 1,
-                :remainingMs => 0
-            };
-            return;
+        if (!mSessionLocked) {
+            mState = IntervalWorkoutLogic.readyState(mSettings);
         }
-
-        if (!mSettings[:valid]) {
-            mState = {
-                :phase => INTERVAL_PHASE_INVALID,
-                :currentSet => 1,
-                :currentRep => 1,
-                :remainingMs => 0
-            };
-            return;
-        }
-
-        mState = {
-            :phase => INTERVAL_PHASE_ARMED,
-            :currentSet => 1,
-            :currentRep => 1,
-            :remainingMs => 0
-        };
     }
 
     hidden function updatePower(info as Activity.Info) as Void {
@@ -221,14 +229,12 @@ class IntervalWorkout extends WatchUi.DataField {
         return mHasPower ? m3sPower.format("%d") : "--";
     }
 
-    hidden function currentPowerCompliance() as Number {
-        var targetZone = IntervalWorkoutLogic.targetZoneForPhase(mSettings, mState[:phase]);
-        return IntervalWorkoutLogic.powerCompliance(m3sPower, mSettings[:ftp], targetZone, mHasPower);
-    }
-
     hidden function intervalTimeText() as String {
-        if (mState[:phase] == INTERVAL_PHASE_ARMED) {
-            return "LAP";
+        if (mState[:phase] == INTERVAL_PHASE_READY) {
+            return mTimerRunning ? "TAP" : "START";
+        }
+        if (mState[:phase] == INTERVAL_PHASE_STARTING) {
+            return IntervalWorkoutLogic.formatStartCountdown(mState[:remainingMs]);
         }
         if (mState[:phase] == INTERVAL_PHASE_COMPLETE) {
             return "DONE";
@@ -236,36 +242,18 @@ class IntervalWorkout extends WatchUi.DataField {
         if (mState[:phase] == INTERVAL_PHASE_INVALID) {
             return "SET";
         }
-        if (mState[:phase] == INTERVAL_PHASE_DISABLED) {
-            return "OFF";
-        }
         return IntervalWorkoutLogic.formatCountdown(mState[:remainingMs]);
     }
 
-    hidden function targetZoneText() as String {
-        if (mState[:phase] == INTERVAL_PHASE_COMPLETE) {
-            return "";
+    hidden function currentTargetZone() as Number or Null {
+        if (!mSettings[:valid]) {
+            return null;
         }
-        if (mState[:phase] == INTERVAL_PHASE_INVALID) {
-            return "";
-        }
-        if (!mSettings[:enabled] || !mSettings[:valid]) {
-            return "";
-        }
-
-        if (mState[:phase] == INTERVAL_PHASE_ARMED) {
-            return IntervalWorkoutLogic.zoneLabel(mSettings[:workZone]);
-        }
-
-        var zone = IntervalWorkoutLogic.targetZoneForPhase(mSettings, mState[:phase]);
-        if (zone == null) {
-            return "";
-        }
-        return IntervalWorkoutLogic.zoneLabel(zone as Number);
+        return IntervalWorkoutLogic.targetZoneForPhase(mSettings, mState[:phase]);
     }
 
     hidden function setProgressText() as String {
-        if ((mState[:phase] == INTERVAL_PHASE_COMPLETE) || (mState[:phase] == INTERVAL_PHASE_INVALID) || !mSettings[:enabled]) {
+        if ((mState[:phase] == INTERVAL_PHASE_COMPLETE) || (mState[:phase] == INTERVAL_PHASE_INVALID)) {
             return "";
         }
         if (mSettings[:setCount] <= 1) {
@@ -275,7 +263,7 @@ class IntervalWorkout extends WatchUi.DataField {
     }
 
     hidden function repProgressText() as String {
-        if ((mState[:phase] == INTERVAL_PHASE_COMPLETE) || (mState[:phase] == INTERVAL_PHASE_INVALID) || !mSettings[:enabled]) {
+        if ((mState[:phase] == INTERVAL_PHASE_COMPLETE) || (mState[:phase] == INTERVAL_PHASE_INVALID)) {
             return "";
         }
         return IntervalWorkoutLogic.formatProgress(mState[:currentRep], mSettings[:repCount]);
@@ -338,6 +326,38 @@ class IntervalWorkout extends WatchUi.DataField {
             Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER
         );
         dc.clearClip();
+    }
+
+    hidden function drawStatusRow(
+        dc as Graphics.Dc,
+        x as Number,
+        y as Number,
+        w as Number,
+        h as Number,
+        defaultFg as Number,
+        statusText as String,
+        targetZone as Number or Null
+    ) as Void {
+        var half = w / 2;
+        drawCell(dc, x, y, half, h, defaultFg, null, statusText, standardFonts());
+
+        if (targetZone == null) {
+            drawCell(dc, x + half, y, w - half, h, defaultFg, null, "", standardFonts());
+            return;
+        }
+
+        var zone = targetZone as Number;
+        drawCell(
+            dc,
+            x + half,
+            y,
+            w - half,
+            h,
+            IntervalWorkoutLogic.zoneTextColor(zone),
+            IntervalWorkoutLogic.zoneColor(zone),
+            IntervalWorkoutLogic.zoneLabel(zone),
+            standardFonts()
+        );
     }
 
     hidden function drawRow(

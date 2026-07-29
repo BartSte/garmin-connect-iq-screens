@@ -1,7 +1,7 @@
 <?xml version="1.0"?>
 <strings>
     <string id="AppName">Interval Workout</string>
-    <string id="EnabledTitle">Enable workout</string>
+    <string id="SettingsTitle">Workout settings</string>
     <string id="FtpTitle">FTP (W)</string>
     <string id="SetCountTitle">Sets</string>
     <string id="RepCountTitle">Repetitions</string>
@@ -23,4 +23,5 @@
     <string id="Zone5Label">Z5</string>
     <string id="Zone6Label">Z6</string>
     <string id="Zone7Label">Z7</string>
+    <string id="DurationMustBePositive">Duration must be at least 00:01</string>
 </strings>

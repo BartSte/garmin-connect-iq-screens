@@ -19,11 +19,11 @@ Each subdirectory under `fields/` is a self-contained Connect IQ project that ca
 
 ## Data fields
 
-| Folder             | Description                                                                                                           |
-| ------------------ | --------------------------------------------------------------------------------------------------------------------- |
-| `minimal-7`        | Full-screen field: time, timer, 3s power (zone color), speed, cadence, ascent, distance                               |
-| `interval-workout` | Full-screen interval-training field: bordered workout grid, 3s power guidance, countdown, zone goal, set/rep progress |
-| `example-field`    | Starter template – displays current speed in km/h                                                                     |
+| Folder             | Description                                                                                                               |
+| ------------------ | ------------------------------------------------------------------------------------------------------------------------- |
+| `minimal-7`        | Full-screen field: time, timer, 3s power (zone color), speed, cadence, ascent, distance                                   |
+| `interval-workout` | Full-screen interval-training field: touch start, zone-colored 3s power, requested zone, countdown, and set/rep progress |
+| `example-field`    | Starter template – displays current speed in km/h                                                                         |
 
 ## Getting started
 
@@ -65,15 +65,57 @@ The scripts assume:
 
 Behavior:
 
-- configure the workout from the phone through Garmin Connect Mobile / Connect IQ app settings
-- keep it passive on normal rides by leaving `Enable workout` off
-- start a ride normally, warm up as long as you want, then press the lap button once to start the interval block
-- continue riding normally after the field reaches `DONE`
+- configure FTP, sets, repetitions, durations, and requested zones directly in
+  the field's settings on the Edge
+- start the activity timer and warm up for as long as needed
+- tap the field once when it shows `TAP` to begin a five-second countdown; tap
+  again during that countdown to cancel
+- pause the activity timer to freeze the countdown or current interval
+- continue riding normally after the final recovery reaches `DONE`
 
-Important:
+The workout remains passive until it is tapped, so there is no `Enable workout`
+setting. Lap and auto-lap events do not start or advance it.
 
-- if you use the lap-to-start workflow, disable Garmin `auto-lap` for that ride profile so an automatic lap does not start the workout
-- a dedicated ride page or separate activity profile is the cleanest setup for interval days
+The large three-second power row uses the same actual FTP-zone colors as
+Minimal-7. The right-hand badge below it shows the requested zone for the
+upcoming or current phase in that zone's color. It is guidance by zone only;
+there is no below/in/above-target coloring.
+
+Within a set, each work interval is followed by repetition recovery. After the
+last repetition of a non-final set, set recovery replaces repetition recovery.
+The last work interval of the workout still includes its normal repetition
+recovery before `DONE`.
+
+Example settings:
+
+- threshold blocks `3 × (20m Z4 + 5m Z1)`: 1 set, 3 repetitions, 20:00 Z4
+  work, 5:00 Z1 repetition recovery, and 0:00 set recovery
+- VO2 blocks `3 × (10 × (40s Z5 + 20s Z1) + 4m Z1)`: 3 sets, 10
+  repetitions, 0:40 Z5 work, 0:20 Z1 repetition recovery, and 4:00 Z1 set
+  recovery
+
+### Interval Workout on-device settings
+
+The settings UI is compiled into the `.prg`, so it works when the app is
+manually sideloaded and does not depend on the Connect IQ Store, Garmin Connect,
+or Garmin Express.
+
+1. Build `fields/interval-workout/bin/interval-workout-edgeexplore2.prg`.
+2. Copy the `.prg` to `Garmin/Apps/` on the Edge over USB.
+3. Disconnect the Edge and open the Connect IQ data-field settings for Interval
+   Workout from the activity profile.
+4. Select a setting, choose its value, and accept it.
+
+Accepted values are stored in the app's local properties and persist across
+device restarts. Further changes need no rebuild, phone synchronization, or USB
+connection. Cancelling a picker preserves its old value. Changes made during a
+running workout are used after the activity is reset; they do not alter the
+locked session.
+
+Keep the UUID in `fields/interval-workout/manifest.xml` unchanged when replacing
+the sideloaded `.prg` so the new build continues to use the existing property
+storage. Existing phone/Store-style XML settings remain supported as an
+alternative.
 
 ## Minimal-7 FTP setting
 
@@ -109,7 +151,7 @@ monkeyc \
   -w
 ```
 
-To build the other field:
+To build `minimal-7`:
 
 ```bash
 mkdir -p fields/minimal-7/bin
@@ -117,6 +159,20 @@ mkdir -p fields/minimal-7/bin
 monkeyc \
   -f fields/minimal-7/monkey.jungle \
   -o fields/minimal-7/bin/minimal-7-edgeexplore2.prg \
+  -y developer_key.der \
+  -d edgeexplore2 \
+  -r \
+  -w
+```
+
+For `interval-workout`:
+
+```bash
+mkdir -p fields/interval-workout/bin
+
+monkeyc \
+  -f fields/interval-workout/monkey.jungle \
+  -o fields/interval-workout/bin/interval-workout-edgeexplore2.prg \
   -y developer_key.der \
   -d edgeexplore2 \
   -r \
@@ -198,8 +254,9 @@ Garmin's official Connect IQ unit-test framework is `Toybox.Test`, and it runs i
 
 This repo now keeps testable logic in helper modules and places unit tests directly in each field project:
 
-- [fields/example-field/source/ExampleFieldTests.mc](/home/barts/code/personal/python/garmin-connect-screens/fields/example-field/source/ExampleFieldTests.mc)
-- [fields/minimal-7/source/Minimal7Tests.mc](/home/barts/code/personal/python/garmin-connect-screens/fields/minimal-7/source/Minimal7Tests.mc)
+- `fields/example-field/source/ExampleFieldTests.mc`
+- `fields/interval-workout/source/IntervalWorkoutTests.mc`
+- `fields/minimal-7/source/Minimal7Tests.mc`
 
 To compile the test-enabled `.prg` files for every field:
 

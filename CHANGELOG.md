@@ -2,6 +2,24 @@
 
 ## Interval Workout
 
+### v0.2.0
+
+- Replaced lap-to-start with a cancellable five-second touchscreen countdown.
+- Removed the `Enable workout` setting; the field remains passive until tapped.
+- Added an on-device settings menu for FTP, sets, repetitions, durations, and
+  zones that works with USB-sideloaded builds.
+- Changed the fresh-install defaults to FTP 248 W and 4:00 Z1 set recovery.
+- Kept existing persisted workout values and duration value/unit properties
+  compatible with upgrades.
+- Changed the three-second average power row to the exact Minimal-7 FTP-zone
+  colors and removed below/in/above-target guidance.
+- Added a separately colored requested-zone badge for the upcoming or current
+  workout phase.
+- Changed non-final set boundaries so set recovery replaces repetition
+  recovery; the final repetition recovery still runs before `DONE`.
+- Added coverage for threshold blocks, grouped 40/20 VO2 blocks, touchscreen
+  control, settings pickers, and zone-color boundaries.
+
 ### v0.1.0
 
 - Initial release of the Interval Workout field for the Garmin Edge Explore 2.
