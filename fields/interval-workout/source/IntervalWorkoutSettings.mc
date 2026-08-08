@@ -269,10 +269,12 @@ class IntervalWorkoutSettingsMenuDelegate extends WatchUi.Menu2InputDelegate {
         allowZero as Boolean,
         item as WatchUi.MenuItem
     ) as Void {
+        var picker = new IntervalWorkoutDurationPicker(title, currentSeconds);
         WatchUi.pushView(
-            new IntervalWorkoutDurationPicker(title, currentSeconds),
+            picker,
             new IntervalWorkoutDurationPickerDelegate(
                 mApp,
+                picker,
                 valuePropertyKey,
                 unitPropertyKey,
                 allowZero,
@@ -396,36 +398,42 @@ class IntervalWorkoutSinglePickerDelegate extends WatchUi.PickerDelegate {
 
 class IntervalWorkoutDurationPicker extends WatchUi.Picker {
 
+    hidden var mTitleResource as Lang.ResourceId;
+    hidden var mInitialSeconds as Number;
+
     function initialize(titleResource as Lang.ResourceId, currentSeconds as Number) {
+        mTitleResource = titleResource;
+        mInitialSeconds = currentSeconds;
+
         var minuteFactory = new IntervalWorkoutNumberPickerFactory(0, 120, INTERVAL_PICKER_PLAIN);
-        var secondFactory = new IntervalWorkoutNumberPickerFactory(0, 59, INTERVAL_PICKER_SECONDS);
-        var separator = new WatchUi.Text({
-            :text => ":",
-            :color => Graphics.COLOR_WHITE,
-            :font => Graphics.FONT_MEDIUM,
-            :locX => WatchUi.LAYOUT_HALIGN_CENTER,
-            :locY => WatchUi.LAYOUT_VALIGN_CENTER
+        var parts = IntervalWorkoutSettings.durationParts(currentSeconds);
+
+        Picker.initialize({
+            :title => durationPartTitle(Rez.Strings.MinutesOption),
+            :pattern => [minuteFactory],
+            :defaults => [minuteFactory.getIndex(parts[:minutes])]
         });
-        var title = new WatchUi.Text({
-            :text => titleResource,
+    }
+
+    function showSeconds() as Void {
+        var secondFactory = new IntervalWorkoutNumberPickerFactory(0, 59, INTERVAL_PICKER_SECONDS);
+        var parts = IntervalWorkoutSettings.durationParts(mInitialSeconds);
+
+        Picker.setOptions({
+            :title => durationPartTitle(Rez.Strings.SecondsOption),
+            :pattern => [secondFactory],
+            :defaults => [secondFactory.getIndex(parts[:seconds])]
+        });
+    }
+
+    hidden function durationPartTitle(partResource as Lang.ResourceId) as WatchUi.Text {
+        var titleText = WatchUi.loadResource(mTitleResource) as String;
+        var partText = WatchUi.loadResource(partResource) as String;
+        return new WatchUi.Text({
+            :text => titleText + " - " + partText,
             :color => Graphics.COLOR_WHITE,
             :locX => WatchUi.LAYOUT_HALIGN_CENTER,
             :locY => WatchUi.LAYOUT_VALIGN_BOTTOM
-        });
-        var pattern = new Array<WatchUi.PickerFactory or WatchUi.Text>[3];
-        pattern[0] = minuteFactory;
-        pattern[1] = separator;
-        pattern[2] = secondFactory;
-
-        var parts = IntervalWorkoutSettings.durationParts(currentSeconds);
-        var defaults = new Array<Number>[3];
-        defaults[0] = minuteFactory.getIndex(parts[:minutes]);
-        defaults[2] = secondFactory.getIndex(parts[:seconds]);
-
-        Picker.initialize({
-            :title => title,
-            :pattern => pattern,
-            :defaults => defaults
         });
     }
 
@@ -439,13 +447,16 @@ class IntervalWorkoutDurationPicker extends WatchUi.Picker {
 class IntervalWorkoutDurationPickerDelegate extends WatchUi.PickerDelegate {
 
     hidden var mApp as IntervalWorkoutApp;
+    hidden var mPicker as IntervalWorkoutDurationPicker;
     hidden var mValuePropertyKey as String;
     hidden var mUnitPropertyKey as String;
     hidden var mAllowZero as Boolean;
     hidden var mItem as WatchUi.MenuItem;
+    hidden var mMinutes as Number or Null;
 
     function initialize(
         app as IntervalWorkoutApp,
+        picker as IntervalWorkoutDurationPicker,
         valuePropertyKey as String,
         unitPropertyKey as String,
         allowZero as Boolean,
@@ -453,10 +464,12 @@ class IntervalWorkoutDurationPickerDelegate extends WatchUi.PickerDelegate {
     ) {
         PickerDelegate.initialize();
         mApp = app;
+        mPicker = picker;
         mValuePropertyKey = valuePropertyKey;
         mUnitPropertyKey = unitPropertyKey;
         mAllowZero = allowZero;
         mItem = item;
+        mMinutes = null;
     }
 
     function onCancel() as Boolean {
@@ -465,15 +478,21 @@ class IntervalWorkoutDurationPickerDelegate extends WatchUi.PickerDelegate {
     }
 
     function onAccept(values as Array) as Boolean {
-        var minutes = values[0];
-        var seconds = values[2];
-        if (!(minutes instanceof Lang.Number) || !(seconds instanceof Lang.Number)) {
+        var selectedValue = values[0];
+        if (!(selectedValue instanceof Lang.Number)) {
+            return true;
+        }
+
+        if (mMinutes == null) {
+            mMinutes = selectedValue as Lang.Number;
+            mPicker.showSeconds();
+            WatchUi.requestUpdate();
             return true;
         }
 
         var totalSeconds = IntervalWorkoutSettings.durationFromParts(
-            minutes as Lang.Number,
-            seconds as Lang.Number
+            mMinutes as Number,
+            selectedValue as Lang.Number
         );
         if (!IntervalWorkoutSettings.durationIsValid(totalSeconds, mAllowZero)) {
             WatchUi.pushView(

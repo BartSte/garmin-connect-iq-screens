@@ -106,6 +106,9 @@ or Garmin Express.
    Workout from the activity profile.
 4. Select a setting, choose its value, and accept it.
 
+For a duration, first select and accept the minutes, then select and accept the
+seconds. The settings menu shows the combined duration, such as `15:00`.
+
 Accepted values are stored in the app's local properties and persist across
 device restarts. Further changes need no rebuild, phone synchronization, or USB
 connection. Cancelling a picker preserves its old value. Changes made during a

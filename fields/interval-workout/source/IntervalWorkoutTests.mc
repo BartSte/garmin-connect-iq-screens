@@ -69,6 +69,45 @@ function intervalWorkoutNormalizesLegacyDurationUnits(logger as Test.Logger) as 
 }
 
 (:test)
+function intervalWorkoutRunsWorkoutConfiguredInMinutes(logger as Test.Logger) as Lang.Boolean {
+    logger.debug("Checking 3 x 15/5 minute workout");
+    var settings = IntervalWorkoutLogic.normalizeSettings({
+        :ftp => 250,
+        :set_count => 1,
+        :rep_count => 3,
+        :work_value => 15,
+        :work_unit => 60,
+        :recovery_value => 5,
+        :recovery_unit => 60,
+        :set_recovery_value => 0,
+        :set_recovery_unit => 1,
+        :work_zone => 4,
+        :recovery_zone => 1,
+        :set_recovery_zone => 1
+    });
+    var state = IntervalWorkoutLogic.startWorkState(1, 1, settings);
+    var afterWork = IntervalWorkoutLogic.applyElapsed(state, settings, 900000);
+    var recovery = afterWork[:state] as Dictionary;
+    var afterRecovery = IntervalWorkoutLogic.applyElapsed(recovery, settings, 300000);
+    var secondWork = afterRecovery[:state] as Dictionary;
+    var complete = IntervalWorkoutLogic.applyElapsed(state, settings, 3600000);
+    var completeState = complete[:state] as Dictionary;
+
+    return settings[:valid]
+        && (settings[:workSecs] == 900)
+        && (settings[:recoverySecs] == 300)
+        && (settings[:workZone] == 4)
+        && (settings[:recoveryZone] == 1)
+        && (recovery[:phase] == INTERVAL_PHASE_RECOVERY)
+        && (recovery[:remainingMs] == 300000)
+        && (secondWork[:phase] == INTERVAL_PHASE_WORK)
+        && (secondWork[:currentRep] == 2)
+        && (secondWork[:remainingMs] == 900000)
+        && (completeState[:phase] == INTERVAL_PHASE_COMPLETE)
+        && (completeState[:currentRep] == 3);
+}
+
+(:test)
 function intervalWorkoutRejectsInvalidRequiredSettings(logger as Test.Logger) as Lang.Boolean {
     logger.debug("Checking required-setting validation");
     var normalizedFtp = IntervalWorkoutLogic.normalizeSettings({
@@ -332,6 +371,9 @@ function intervalWorkoutDurationPickerEncoding(logger as Test.Logger) as Lang.Bo
     var encoded = IntervalWorkoutSettings.durationPropertyValues(
         IntervalWorkoutSettings.durationFromParts(4, 20)
     );
+    var fifteenMinutes = IntervalWorkoutSettings.durationFromParts(15, 0);
+    var fiveMinutes = IntervalWorkoutSettings.durationFromParts(5, 0);
+    var fifteenMinuteParts = IntervalWorkoutSettings.durationParts(fifteenMinutes);
 
     return (maximum[:minutes] == 120)
         && (maximum[:seconds] == 59)
@@ -339,6 +381,10 @@ function intervalWorkoutDurationPickerEncoding(logger as Test.Logger) as Lang.Bo
         && (minimum[:seconds] == 0)
         && (encoded[:value] == 260)
         && (encoded[:unit] == 1)
+        && (fifteenMinutes == 900)
+        && (fiveMinutes == 300)
+        && (fifteenMinuteParts[:minutes] == 15)
+        && (fifteenMinuteParts[:seconds] == 0)
         && !IntervalWorkoutSettings.durationIsValid(0, false)
         && IntervalWorkoutSettings.durationIsValid(1, false)
         && IntervalWorkoutSettings.durationIsValid(0, true);

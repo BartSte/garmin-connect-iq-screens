@@ -8,6 +8,8 @@
 - Removed the `Enable workout` setting; the field remains passive until tapped.
 - Added an on-device settings menu for FTP, sets, repetitions, durations, and
   zones that works with USB-sideloaded builds.
+- Fixed duration entry on the Edge Explore 2 by selecting minutes and seconds
+  in separate steps.
 - Changed the fresh-install defaults to FTP 248 W and 4:00 Z1 set recovery.
 - Kept existing persisted workout values and duration value/unit properties
   compatible with upgrades.
